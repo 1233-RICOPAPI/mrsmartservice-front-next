@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administrador | MR SmartService</title>
+
+  <link rel="stylesheet" href="style.css?v=49" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;700&family=Open+Sans:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+  /* =========================================================
+     1. ARREGLO DE PESTAÑAS (Para que no se mezclen)
+     ========================================================= */
+  
+  .tab-pane {
+    display: none !important;
+  }
+  
+  .tab-pane.active {
+    display: block !important;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+
+  /* =========================================================
+     2. DISEÑO DEL PERFIL (Ordenado y Limpio)
+     ========================================================= */
+
+  #tab-perfil.active {
+    display: grid !important; 
+    /* En PC se ponen lado a lado, en móvil uno bajo otro */
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+    align-items: start;
+  }
+
+  #tab-perfil .admin-card, 
+  #usersAdmin {
+    background: #ffffff !important;
+    padding: 30px !important;
+    border-radius: 16px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+    text-align: left !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-perfil h2 {
+    font-size: 1.4rem !important;
+    color: #1e293b !important;
+    margin-bottom: 20px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    width: 100% !important;
+  }
+
+  #tab-perfil input {
+    width: 100% !important;
+    padding: 12px 15px !important;
+    margin-bottom: 15px !important;
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important; 
+  }
+
+  #tab-perfil button {
+    width: 100% !important;
+    padding: 12px !important;
+    background-color: #2563eb !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    margin-top: 10px !important;
+  }
+
+
+  /* =========================================================
+     3. LISTA DE PRODUCTOS (2 COLUMNAS EN MÓVIL)
+     ========================================================= */
+  
+  #listaAdmin {
+    display: grid !important;
+    /* CAMBIO CLAVE: minmax(155px, 1fr) permite que quepan 2 en pantallas pequeñas */
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)) !important;
+    gap: 15px !important; /* Gap un poco más pequeño para ahorrar espacio */
+    padding-top: 15px !important;
+  }
+
+  #listaAdmin .admin-card {
+    background: white !important;
+    border: 1px solid #f1f5f9 !important;
+    border-radius: 12px !important;
+    padding: 10px !important; /* Menos padding interno */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  /* Imagen más pequeña para que no ocupe todo */
+  #listaAdmin img {
+    width: 100% !important;
+    height: 110px !important; /* Altura reducida */
+    object-fit: contain !important;
+    background: #f8fafc !important;
+    border-radius: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  /* Textos compactos */
+  #listaAdmin h4 {
+    font-size: 0.9rem !important;
+    margin: 5px 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  #listaAdmin .botones {
+    display: flex !important;
+    flex-direction: column !important; /* Botones uno encima del otro en móvil */
+    gap: 5px !important;
+    margin-top: 8px !important;
+  }
+
+  #listaAdmin button {
+    width: 100% !important;
+    padding: 6px !important;
+    border-radius: 6px !important;
+    font-size: 0.8rem !important;
+    border: none !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+  }
+  
+  .btn-edit { background: #3b82f6 !important; color: white !important; }
+  .btn-delete { background: #ef4444 !important; color: white !important; }
+
+
+  /* =========================================================
+     4. GENERALES
+     ========================================================= */
+  
+  label {
+    display: block !important;
+    margin-bottom: 5px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+  }
+
+  .admin-container {
+    overflow-x: hidden !important; 
+  }
+</style>
+
+</head>
+
+<body class="admin-page">
+  <header class="main-header">
+    <div class="logo-container">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img" />
+      <h1>MR SmartService</h1>
+    </div>
+
+    <nav class="admin-nav" aria-label="Navegación del panel">
+      <span class="badge-admin" aria-current="page">Administrador</span>
+    </nav>
+
+    <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
+  </header>
+
+  <section class="admin-panel">
+    <div class="admin-container">
+
+      <!-- Pestañas -->
+      <div class="admin-tabs" role="tablist" aria-label="Secciones del panel">
+        <button
+          id="tab-prod-tab"
+          class="tab-btn active"
+          data-tab="tab-prod"
+          role="tab"
+          type="button"
+          aria-selected="true"
+          aria-controls="tab-prod"
+        >
+          Productos
+        </button>
+        <button
+          id="tab-tienda-tab"
+          class="tab-btn"
+          data-tab="tab-tienda"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-tienda"
+        >
+          Tienda
+        </button>
+        <!-- Domicilios visible para USER -->
+        <button
+          id="tab-domicilios-tab"
+          class="tab-btn"
+          data-tab="tab-domicilios"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-domicilios"
+        >
+          Domicilios
+        </button>
+        <!-- Publicidad solo admin/dev -->
+        <button
+          id="tab-ads-tab"
+          class="tab-btn hide-for-user"
+          data-tab="tab-ads"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-ads"
+        >
+          Publicidad
+        </button>
+        <!-- Ventas visible para USER -->
+        <button
+          id="tab-ventas-tab"
+          class="tab-btn"
+          data-tab="tab-ventas"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-ventas"
+        >
+          Ventas
+        </button>
+        <!-- Estadísticas solo staff -->
+        <button
+          id="tab-estadisticas-tab"
+          class="tab-btn hide-for-user"
+          data-tab="tab-estadisticas"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-estadisticas"
+        >
+          Estadísticas
+        </button>
+        <!-- Perfil/Usuarios solo staff -->
+        <button
+          id="tab-perfil-tab"
+          class="tab-btn hide-for-user"
+          data-tab="tab-perfil"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-perfil"
+        >
+          Perfil
+        </button>
+      </div>
+      <!-- ============================
+            TAB — GESTIÓN DE PRODUCTOS
+      ============================== -->
+
+      <div
+        id="tab-prod"
+        class="tab-pane active"
+        role="tabpanel"
+        aria-labelledby="tab-prod-tab"
+      >
+        <div class="panel-head" style="text-align:center;">
+          <h2>Gestión de Productos</h2>
+          <p style="color:#64748b;">Administra tu catálogo de forma sencilla</p>
+        </div>
+
+        <!-- FORMULARIO PARA CREAR PRODUCTO -->
+        <form id="formProducto" class="modern-admin-form" autocomplete="off">
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="nombre">Nombre del producto</label>
+              <input type="text" id="nombre" name="nombre" required />
+            </div>
+
+            <div class="form-group">
+              <label for="categoria">Categoría</label>
+              <input list="catList" id="categoria" name="categoria" required />
+              <datalist id="catList">
+                <option value="Computadoras"></option>
+                <option value="Componentes"></option>
+                <option value="Cámaras"></option>
+                <option value="Accesorios"></option>
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="precio">Precio ($)</label>
+              <input type="number" id="precio" name="precio" min="0" required />
+            </div>
+
+            <div class="form-group">
+              <label for="stock">Stock</label>
+              <input type="number" id="stock" name="stock" min="0" required />
+            </div>
+          </div>
+
+          <!-- DESCUENTO + RANGO DE FECHAS -->
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="discount">Descuento (%)</label>
+              <input
+                type="number"
+                id="discount"
+                name="discount"
+                min="0"
+                max="90"
+                value="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Vigencia del descuento</label>
+              <div style="display:flex; gap:8px;">
+                <input
+                  type="date"
+                  id="discountStart"
+                  placeholder="Desde"
+                  aria-label="Fecha de inicio del descuento"
+                />
+                <input
+                  type="date"
+                  id="discountEnd"
+                  placeholder="Hasta"
+                  aria-label="Fecha de fin del descuento"
+                />
+              </div>
+              <small>Si dejas ambas fechas vacías, el descuento aplica siempre.</small>
+            </div>
+          </div>
+
+          <!-- DESCRIPCIÓN -->
+          <div class="form-group">
+            <label for="description">Descripción del producto</label>
+            <textarea
+              id="description"
+              name="description"
+              rows="4"
+              placeholder="Descripción detallada del producto..."
+            ></textarea>
+          </div>
+
+          <!-- FICHA TÉCNICA -->
+          <div class="form-group">
+            <label for="tech_sheet">Ficha técnica</label>
+            <textarea
+              id="tech_sheet"
+              name="tech_sheet"
+              rows="6"
+              placeholder="Pantalla: 144Hz&#10;Procesador: Ryzen 5&#10;RAM: 16GB"
+            ></textarea>
+          </div>
+
+<!-- MULTIMEDIA (IMÁGENES + VIDEOS) -->
+<div class="media-upload-section">
+  <div class="media-title"><span>🖼️</span> Multimedia del producto (máx. 6)</div>
+
+  <div class="form-group">
+    <label for="mediaUrls">URLs (1 por línea, en el orden que quieres mostrar)</label>
+    <textarea
+      id="mediaUrls"
+      name="mediaUrls"
+      rows="4"
+      placeholder="https://...jpg&#10;https://...mp4&#10;https://youtu.be/..."
+    ></textarea>
+    <small>Puedes mezclar imágenes y videos. Máximo 6 en total (se guarda en el orden que pongas aquí + el orden de los archivos seleccionados).</small>
+  </div>
+
+  <div class="divider-text">
+    <span>O SUBIR ARCHIVOS</span>
+  </div>
+
+  <div class="file-input-wrapper">
+    <label for="mediaFiles" class="file-custom-btn">
+      📂 Seleccionar imágenes / videos
+    </label>
+    <input
+      type="file"
+      id="mediaFiles"
+      name="mediaFiles"
+      accept="image/*,video/*"
+      multiple
+      aria-label="Subir imágenes o videos del producto"
+    />
+  </div>
+
+  <!-- Compatibilidad (inputs antiguos, ocultos) -->
+  <div style="display:none" aria-hidden="true">
+    <input type="url" id="imageUrl" name="imageUrl" />
+    <input type="file" id="imgFile" name="imgFile" accept="image/*" />
+    <input type="url" id="videoUrl" name="videoUrl" />
+    <input type="file" id="videoFile" name="videoFile" accept="video/*" />
+  </div>
+</div>
+
+<button type="submit" class="btn-save-modern">
+            💾 Agregar Producto
+          </button>
+        </form>
+
+        <div id="listaAdmin" class="lista-productos-admin" aria-live="polite"></div>
+      </div>
+
+      <!-- ============================
+           MODAL EDITAR PRODUCTO
+      ============================== -->
+      <div
+        id="modalEditProd"
+        class="modal-envio hidden"
+        aria-modal="true"
+        role="dialog"
+        aria-labelledby="modalEditProdTitle"
+      >
+        <div class="modal-envio-backdrop"></div>
+
+        <div class="modal-envio-dialog modal-edit-prod-dialog">
+          <h2 id="modalEditProdTitle" class="modal-envio-title">
+            Editar producto
+          </h2>
+
+          <form id="formEditProd" class="formulario-admin">
+            <div class="campo">
+              <label for="editName">Nombre</label>
+              <input type="text" id="editName" required />
+            </div>
+
+            <div class="campo">
+              <label for="editCategory">Categoría</label>
+              <input type="text" id="editCategory" />
+            </div>
+
+            <div class="campo">
+              <label for="editPrice">Precio ($)</label>
+              <input type="number" id="editPrice" min="0" step="1" required />
+            </div>
+
+            <div class="campo">
+              <label for="editStock">Stock</label>
+              <input type="number" id="editStock" min="0" step="1" required />
+            </div>
+
+            <div class="campo">
+              <label for="editDescripcion">Descripción</label>
+              <textarea
+                id="editDescripcion"
+                rows="4"
+                placeholder="Descripción detallada del producto..."
+              ></textarea>
+            </div>
+
+            <div class="campo">
+              <label for="editSpecs">Ficha técnica</label>
+              <textarea
+                id="editSpecs"
+                rows="6"
+                placeholder="Pantalla: 144Hz&#10;Procesador: Ryzen 5&#10;RAM: 16GB"
+              ></textarea>
+            </div>
+
+            <div class="campo">
+              <p class="campo-label">Vista previa ficha técnica</p>
+              <div
+                id="editSpecsPreview"
+                class="specs-preview-box"
+                aria-live="polite"
+              >
+                Escribe para ver la vista previa…
+              </div>
+            </div>
+
+            <!-- DESCUENTO + VIGENCIA (EDITAR) -->
+            <div class="campo">
+              <label for="editDiscountPercent">Descuento (%)</label>
+              <input
+                type="number"
+                id="editDiscountPercent"
+                min="0"
+                max="90"
+              />
+            </div>
+
+            <div class="campo">
+              <label>Vigencia del descuento</label>
+              <div style="display:flex; gap:8px;">
+                <input
+                  type="date"
+                  id="editDiscountStart"
+                  placeholder="Desde"
+                  aria-label="Fecha de inicio del descuento"
+                />
+                <input
+                  type="date"
+                  id="editDiscountEnd"
+                  placeholder="Hasta"
+                  aria-label="Fecha de fin del descuento"
+                />
+              </div>
+              <small>Si dejas ambas fechas vacías, el descuento aplica siempre.</small>
+            </div>
+
+<div class="campo">
+  <label for="editMediaUrls">Multimedia (URLs, 1 por línea, máx. 6)</label>
+  <textarea
+    id="editMediaUrls"
+    rows="4"
+    placeholder="https://...jpg&#10;https://...mp4&#10;https://youtu.be/..."
+  ></textarea>
+  <small>Orden = el orden del listado. Puedes mezclar imágenes y videos.</small>
+</div>
+
+<div class="campo">
+  <label for="editMediaFiles">Agregar archivos (imágenes / videos)</label>
+  <input type="file" id="editMediaFiles" accept="image/*,video/*" multiple />
+  <small>Los archivos se agregan al final respetando el orden de selección. Máximo 6 en total.</small>
+</div>
+
+<!-- Compatibilidad (inputs antiguos, ocultos) -->
+<div style="display:none" aria-hidden="true">
+  <input type="text" id="editImageUrl" />
+  <input type="file" id="editImgFile" accept="image/*" />
+  <input type="text" id="editVideoUrl" />
+  <input type="file" id="editVideoFile" accept="video/*" />
+</div>
+            <div class="modal-footer">
+              <button type="button" id="editCancel" class="btn-secondary">
+                Cancelar
+              </button>
+              <button type="submit" class="btn-primario full-width">
+                Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+       <!-- ============================
+            TAB — PUBLICIDAD
+      ============================ -->
+      <div
+        id="tab-ads"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-ads-tab"
+        hidden
+      >
+        <div class="panel-head" style="text-align:center;">
+          <h2>Gestión de Publicidad</h2>
+          <p style="color:#64748b;">Configura los banners del inicio</p>
+        </div>
+
+        <form id="formAds" class="modern-admin-form" autocomplete="off">
+          <input type="hidden" id="adId" />
+
+          <div class="form-group">
+            <label for="adTitle">Título del anuncio</label>
+            <input
+              type="text"
+              id="adTitle"
+              required
+              placeholder="Ej: Gran Promo Navideña"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="adDesc">Descripción breve</label>
+            <textarea id="adDesc" rows="2"></textarea>
+          </div>
+
+          <div class="media-upload-section">
+            <div class="media-title">🖼️ Contenido Visual</div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="adImageUrl">URL Imagen</label>
+                <input type="url" id="adImageUrl" placeholder="https://..." />
+              </div>
+
+              <div class="form-group">
+                <label for="adVideoUrl">URL Video</label>
+                <input type="url" id="adVideoUrl" placeholder="https://..." />
+              </div>
+            </div>
+
+            <div class="divider-text"><span>O SUBIR ARCHIVOS</span></div>
+
+            <div class="form-row-2">
+              <div class="file-input-wrapper">
+                <label for="adImageFile" class="file-custom-btn">
+                  📂 Subir Imagen
+                </label>
+                <input
+                  type="file"
+                  id="adImageFile"
+                  accept="image/*"
+                  aria-label="Subir imagen para el anuncio"
+                />
+              </div>
+
+              <div class="file-input-wrapper">
+                <label for="adVideoFile" class="file-custom-btn">
+                  🎬 Subir Video
+                </label>
+                <input
+                  type="file"
+                  id="adVideoFile"
+                  accept="video/*"
+                  aria-label="Subir video para el anuncio"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row-2" style="align-items:center;">
+            <label
+              for="adActive"
+              style="display:flex; gap:10px; align-items:center;"
+            >
+              <input type="checkbox" id="adActive" checked />
+              <span>Anuncio activo</span>
+            </label>
+
+            <div style="display:flex; gap:10px;">
+              <button type="button" id="adResetBtn" class="btn-secondary">
+                Limpiar
+              </button>
+              <button type="submit" id="adSubmitBtn" class="btn-save-modern">
+                Guardar
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <hr class="divider" />
+
+        <div class="table-wrap">
+          <table class="smart-table" id="adsTable">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Título</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Creado</th>
+                <th scope="col" class="right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="adsTableBody"></tbody>
+          </table>
+          <div id="adsEmpty" class="empty-state" hidden>
+            <p>No hay anuncios creados.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================
+            TAB — VENTAS
+      ============================ -->
+      <div
+        id="tab-ventas"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-ventas-tab"
+        hidden
+      >
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Historial de ventas</h2>
+
+            <form id="filtrosVentas" class="filters">
+              <div class="field">
+                <label for="ventaDesde">Desde</label>
+                <input type="date" id="ventaDesde" />
+              </div>
+
+              <div class="field">
+                <label for="ventaHasta">Hasta</label>
+                <input type="date" id="ventaHasta" />
+              </div>
+
+              <div class="field">
+                <label for="ventaEstado">Estado</label>
+                <select id="ventaEstado">
+                  <option value="todos">Todos</option>
+                  <option value="approved" selected>Aprobado</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="rejected">Rechazado</option>
+                </select>
+              </div>
+
+              <div class="field grow">
+                <label for="ventaQuery">Buscar</label>
+                <input
+                  type="search"
+                  id="ventaQuery"
+                  placeholder="Cliente, email, #orden…"
+                />
+              </div>
+
+              <button type="submit" class="btn btn-primary">Aplicar</button>
+            </form>
+          </header>
+
+          <div class="table-wrap">
+            <table class="smart-table" id="tablaVentas">
+              <thead>
+                <tr>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Orden</th>
+                  <th scope="col">Cliente</th>
+                  <th scope="col">Total</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col" class="right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="ventasBody"></tbody>
+            </table>
+
+            <div id="ventasEmpty" class="empty-state" hidden>
+              <p>No hay ventas para mostrar.</p>
+            </div>
+          </div>
+
+          <footer class="panel-foot">
+            <div class="pager">
+              <button type="button" class="btn btn-light" id="prevVentas">
+                Anterior
+              </button>
+              <span id="infoVentas">Página 1 de 1</span>
+              <button type="button" class="btn btn-light" id="nextVentas">
+                Siguiente
+              </button>
+            </div>
+          </footer>
+        </section>
+      </div>
+
+      <!-- ============================
+            TAB — ESTADÍSTICAS
+      ============================ -->
+      <div
+        id="tab-estadisticas"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-estadisticas-tab"
+        hidden
+      >
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Estadísticas</h2>
+
+            <div class="filters">
+              <div class="field">
+                <label for="statsRange">Rango</label>
+                <select id="statsRange" name="statsRange">
+                  <option value="day">Diario</option>
+                  <option value="week">Semanal</option>
+                  <option value="month" selected>Mensual</option>
+                  <option value="year">Anual</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-primary" id="btnStats">
+                Actualizar
+              </button>
+            </div>
+          </header>
+
+          <div class="stats-grid">
+            <div class="kpi">
+              <span>Ingresos</span>
+              <strong id="kpiIngresos">$0</strong>
+              <small id="kpiIngresosDelta"></small>
+            </div>
+            <div class="kpi">
+              <span>Órdenes</span>
+              <strong id="kpiOrdenes">0</strong>
+              <small id="kpiOrdenesDelta"></small>
+            </div>
+            <div class="kpi">
+              <span>Ticket promedio</span>
+              <strong id="kpiTicket">$0</strong>
+              <small id="kpiTicketDelta"></small>
+            </div>
+            <div class="kpi">
+              <span>Tasa de aprobación</span>
+              <strong id="kpiRate">0%</strong>
+              <small id="kpiRateDelta"></small>
+            </div>
+          </div>
+
+          <div class="mini-bars" id="barsVentas"></div>
+        </section>
+      </div>
+
+
+      
+
+      <!-- ============================
+            TAB — PERFIL + USUARIOS
+      ============================ -->
+      <div
+        id="tab-perfil"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-perfil-tab"
+        hidden
+      >
+        <section class="admin-card">
+          <h2>Mi perfil – Cambiar contraseña</h2>
+
+          <form id="formChangePassword" class="form-grid" autocomplete="off">
+            <div class="profile-row">
+              <div class="form-field">
+                <label for="oldPassword">Contraseña actual</label>
+                <input type="password" id="oldPassword" required />
+              </div>
+            </div>
+
+            <div class="profile-row profile-row-2">
+              <div class="form-field">
+                <label for="newPassword">Nueva contraseña</label>
+                <input type="password" id="newPassword" required />
+              </div>
+
+              <div class="form-field">
+                <label for="newPassword2">Repetir nueva contraseña</label>
+                <input type="password" id="newPassword2" required />
+              </div>
+            </div>
+
+            <div class="profile-actions">
+              <button type="submit" class="btn-primary">
+                Actualizar contraseña
+              </button>
+              <p id="changePassMsg"></p>
+            </div>
+          </form>
+        </section>
+
+        <section id="usersAdmin" class="admin-card admin-users-card"></section>
+      </div>
+
+      <!-- ============================
+            TAB — TIENDA
+      ============================ -->
+      <div
+        id="tab-tienda"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-tienda-tab"
+        hidden
+      >
+        <h2>Vista de la tienda</h2>
+        <div class="tienda-preview">
+          <iframe
+            id="tiendaFrame"
+            src="index.html"
+            loading="lazy"
+            title="Vista de la tienda"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- ============================
+            TAB — DOMICILIOS
+      ============================ -->
+      <div
+        id="tab-domicilios"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-domicilios-tab"
+        hidden
+      >
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Domicilios</h2>
+          </header>
+
+          <div class="filters">
+            <div class="field">
+              <label for="domEstado">Estado</label>
+              <select id="domEstado">
+                <option value="pendiente">Pendientes</option>
+                <option value="entregado">Entregados</option>
+                <option value="todos">Todos</option>
+              </select>
+            </div>
+
+            <div class="field grow">
+              <label for="domQuery">Buscar</label>
+              <input
+                type="search"
+                id="domQuery"
+                placeholder="Nombre, barrio, ciudad…"
+              />
+            </div>
+
+            <button type="button" id="domRefresh" class="btn-primary">
+              Actualizar
+            </button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="smart-table" id="domTable">
+              <thead>
+                <tr>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Orden</th>
+                  <th scope="col">Cliente</th>
+                  <th scope="col">Dirección</th>
+                  <th scope="col">Ciudad/Barrio</th>
+                  <th scope="col">Teléfono</th>
+                  <th scope="col">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="domTableBody"></tbody>
+            </table>
+
+            <div id="domEmpty" class="empty-state" hidden>
+              <p>No hay domicilios para mostrar.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div> <!-- END admin-container -->
+  </section>
+
+  <!-- TOAST -->
+  <div id="appToast" class="toast hidden" aria-live="polite">
+    <span id="appToastMsg"></span>
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div
+    id="appConfirm"
+    class="modal-envio hidden"
+    aria-modal="true"
+    role="dialog"
+    aria-labelledby="appConfirmTitle"
+  >
+    <div class="modal-envio-backdrop"></div>
+    <div class="modal-envio-dialog modal-confirm-dialog">
+      <h2 id="appConfirmTitle">¿Estás seguro?</h2>
+      <p id="appConfirmMsg" class="modal-confirm-text"></p>
+      <div class="modal-confirm-actions">
+        <button id="appConfirmCancel" class="btn-secondary" type="button">
+          Cancelar
+        </button>
+        <button id="appConfirmOk" class="btn-danger" type="button">
+          Aceptar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div id="app-footer"></div>
+
+  <!-- SCRIPTS -->
+  <script src="js/app.config.js?v=49"></script>
+  <script src="js/app.ui.js?v=49"></script>
+  <script src="js/app.catalog.js?v=49"></script>
+  <script src="js/app.cart.js?v=49"></script>
+
+  <!-- Firebase (Storage) - compat (global firebase) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <!-- Tu config/funciones Firebase (debe ir DESPUÉS de los SDKs) -->
+  <script src="js/app.firebase.js?v=49"></script>
+
+  
+  <script>
+    // Para evitar el error storage/unauthorized en Firebase Storage,
+    // el panel sube archivos por el backend (/api/upload) por defecto.
+    window.MR_USE_FIREBASE_STORAGE = false;
+  </script>
+
+  <!-- Auth primero (para que el token/usuario esté listo) -->
+  <script src="js/app.auth.js?v=49"></script>
+
+  <!-- Admin después (usa auth + firebase) -->
+  <script src="js/app.admin.js?v=49"></script>
+
+  <!-- Otros módulos -->
+  <script src="js/app.detail.js?v=49"></script>
+  <script src="js/app.home.js?v=49"></script>
+  <script src="js/app.footer.js?v=49"></script>
+  <script src="js/app.main.js?v=49"></script>
+
+  <script>
+    // SOLO actualizar badge según el rol, sin redirigir.
+    document.addEventListener("DOMContentLoaded", async () => {
+      const badge = document.querySelector(".badge-admin");
+
+      try {
+        const token = localStorage.getItem("token") || "";
+
+        if (!token || typeof API === "undefined") {
+          if (badge) badge.textContent = "Usuario";
+          return;
+        }
+
+        const res = await fetch(API + "/me", {
+          headers: { Authorization: "Bearer " + token },
+        });
+
+        if (!res.ok) {
+          if (badge) badge.textContent = "Usuario";
+          return;
+        }
+
+        const me = await res.json();
+        const role = String(me.role || "").toUpperCase();
+
+        if (!badge) return;
+
+        if (role === "DEV_ADMIN") {
+          badge.textContent = "Developer";
+        } else if (role === "ADMIN") {
+          badge.textContent = "Administrador";
+        } else {
+          // USER u otro rol
+          badge.textContent = "Usuario";
+        }
+      } catch (err) {
+        console.error("Error comprobando rol en admin.html:", err);
+        if (badge) badge.textContent = "Usuario";
+      }
+    });
+  </script>
+</body>
+</html>

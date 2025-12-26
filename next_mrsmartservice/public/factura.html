@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factura - MR SmartService</title>
+  <link rel="stylesheet" href="css/style.css?v=48" />
+  <style>
+    .invoice-wrap{max-width:900px;margin:30px auto;padding:20px;background:#fff;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+    .invoice-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+    .invoice-head h1{margin:0;font-size:22px}
+    .invoice-meta{font-size:14px;color:#555}
+    .invoice-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn-primary{background:#111827;color:#fff}
+    .btn-ghost{background:#f3f4f6;color:#111827}
+    .invoice-table{width:100%;border-collapse:collapse;margin-top:16px}
+    .invoice-table th,.invoice-table td{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left}
+    .invoice-total{margin-top:14px;display:flex;justify-content:flex-end}
+    .invoice-total .box{min-width:280px}
+    .muted{color:#6b7280}
+    @media print{ .no-print{display:none} body{background:#fff} .invoice-wrap{box-shadow:none;margin:0;border-radius:0} }
+  </style>
+</head>
+<body>
+  <div class="invoice-wrap" id="invoiceApp">
+    <div class="invoice-head">
+      <div>
+        <h1>Factura mostrador</h1>
+        <div class="invoice-meta muted" id="invCompany"></div>
+        <div class="invoice-meta" id="invMeta"></div>
+      </div>
+      <div class="invoice-actions no-print">
+        <button class="btn btn-ghost" id="btnBack">Volver</button>
+        <button class="btn btn-primary" id="btnPrint">Imprimir / Guardar PDF</button>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0;" />
+
+    <div id="invCustomer" class="invoice-meta"></div>
+
+    <table class="invoice-table" id="invTable">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th style="width:90px;">Cant.</th>
+          <th style="width:140px;">Precio</th>
+          <th style="width:160px;">Total</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="invoice-total">
+      <div class="box invoice-meta" id="invTotals"></div>
+    </div>
+
+    <p class="invoice-meta muted" style="margin-top:12px;">Compra realizada en el sitio web de MR SmartService.</p>
+  </div>
+
+  <script src="js/app.config.js?v=48"></script>
+  <script src="js/app.invoice.js?v=48"></script>
+</body>
+</html>

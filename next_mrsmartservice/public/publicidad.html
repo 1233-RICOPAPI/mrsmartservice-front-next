@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Publicidad | MR SmartService</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="js/app.config.js?v=1"></script>
+
+  <style>
+    .ads-wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+    .ads-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .ads-head h1{margin:0;font-size:28px}
+    .ads-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .ads-tools input,.ads-tools select{
+      padding:10px 12px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;min-width:220px
+    }
+    .ads-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:12px}
+    .ad-card{background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.06);overflow:hidden;display:flex;flex-direction:column}
+    .ad-media{background:#f6f7fb;display:flex;align-items:center;justify-content:center}
+    .ad-media img,.ad-media video{width:100%;height:210px;object-fit:cover;display:block}
+    .ad-body{padding:14px 14px 12px}
+    .ad-body h3{margin:0 0 6px;font-size:16px;line-height:1.2}
+    .ad-body p{margin:0;color:#6b7280;font-size:13px;line-height:1.35}
+    .ads-footer{display:flex;justify-content:center;margin-top:18px}
+    .btn-load{
+      border:0;cursor:pointer;padding:12px 14px;border-radius:12px;font-weight:800;
+      background:#1f2937;color:#fff
+    }
+    .muted{color:#6b7280}
+    @media (max-width: 900px){ .ads-grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width: 520px){
+      .ads-grid{grid-template-columns:1fr}
+      .ads-tools input,.ads-tools select{min-width:unset;width:100%}
+      .ads-tools{width:100%}
+      .ads-head{align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+   <header class="main-header">
+    <div class="logo-container">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
+      <h1>MR SmartService</h1>
+    </div>
+    <nav class="main-nav">
+      <a href="index.html" >Inicio</a>
+      <a href="publicidad.html" class="active">publicidad</a>
+      <a href="contacto.html">Contacto</a>
+      <button id="btnAdmin" class="btn-admin">Login</button>
+    </nav>
+  </header>
+  <main class="ads-wrap">
+    <div class="ads-head">
+      <div>
+        <h1>Publicidad</h1>
+        <div class="muted">Anuncios activos del sistema (mejor rendimiento que en Home).</div>
+      </div>
+
+      <div class="ads-tools">
+        <input id="q" type="search" placeholder="Buscar anuncio..." />
+        <select id="type">
+          <option value="all">Todos</option>
+          <option value="image">Solo imagen</option>
+          <option value="video">Solo video</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="status" class="muted"></div>
+
+    <section class="ads-grid" id="adsGrid"></section>
+
+    <div class="ads-footer">
+      <button class="btn-load" id="btnMore" type="button" style="display:none">Cargar más</button>
+    </div>
+  </main>
+
+  <script src="js/app.main.js?v=99"></script>
+  <script src="js/app.publicidad.js?v=1"></script>
+</body>
+</html>

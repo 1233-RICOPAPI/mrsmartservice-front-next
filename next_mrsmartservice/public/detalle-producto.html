@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle del producto | MR SmartService</title>
+
+  <link rel="stylesheet" href="style.css?v=48">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Josefin+Sans&family=Open+Sans&display=swap"
+    rel="stylesheet"
+  >
+</head>
+<body>
+
+  <!-- ========== HEADER ========== -->
+  <header class="main-header">
+    <div class="logo-container">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
+      <h1>MR SmartService</h1>
+    </div>
+
+    <nav class="main-nav">
+      <a href="index.html">Inicio</a>
+      <a href="carrito.html">Carrito</a>
+      <button id="btnAdmin" class="btn-admin" type="button">Login</button>
+    </nav>
+  </header>
+
+  <!-- ========== ICONO CARRITO FLOTANTE ========== -->
+  <a href="carrito.html" class="cart-float" aria-label="Ir al carrito">
+    🛒 <span id="cart-count">0</span>
+  </a>
+
+  <!-- ========== DETALLE PRODUCTO + RESEÑAS ========== -->
+  <main class="detalle-main">
+    <section
+      id="detalleProducto"
+      class="detalle-grid"
+      role="region"
+      aria-label="Detalle del producto"
+    ><div class="prod-descripcion">
+  <h2>Descripción</h2>
+  <p id="descripcionProducto"></p>
+</div>
+
+<div class="prod-ficha">
+  <h2>Características Principales</h2>
+  <table class="tabla-ficha" id="tablaFicha"></table>
+</div>
+
+      <!-- initDetalleProducto() pintará la ficha completa -->
+    </section>
+
+    <section
+      id="detalleReviewsSection"
+      class="detalle-reviews"
+      aria-label="Opiniones de clientes"
+    >
+      <!-- Contenedor para reseñas -->
+    </section>
+  </main>
+
+  <!-- ========== MODAL ENVÍO / CHECKOUT (igual que carrito) ========== -->
+  <div id="modalEnvio" class="modal-ml hidden">
+  <div class="modal-ml-backdrop"></div>
+
+  <div class="modal-ml-dialog">
+    <button id="modalEnvioCancelar" class="btn-close-modal">✕</button>
+
+    <div class="modal-ml-grid">
+      
+      <div class="modal-ml-main">
+        <h2 class="ml-title-main">Elige la forma de entrega</h2>
+
+        <div class="ml-card-wrapper">
+          <label class="ml-card" for="radioDom">
+            <div class="ml-card-header">
+              <div class="ml-radio-area">
+                <input type="radio" id="radioDom" name="shippingMode" value="domicilio">
+                <span class="ml-card-title">Enviar a domicilio</span>
+              </div>
+              <span class="ml-price">$ 15.000</span>
+            </div>
+            
+            <div class="ml-card-body">
+              <p class="ml-address">Villavicencio, Meta</p>
+              <p class="ml-sub">Llega mañana a tu dirección</p>
+            </div>
+          </label>
+
+          <div id="shippingFormWrapper" class="shipping-form-container hidden">
+            <div class="ml-form-grid">
+              <div class="ml-field">
+                <label>Nombre de contacto</label>
+                <input type="text" id="shipNombre" placeholder="Ej: Juan Pérez">
+              </div>
+              <div class="ml-field">
+                <label>Teléfono</label>
+                <input type="tel" id="shipTelefono" placeholder="Ej: 3001234567">
+              </div>
+              <div class="ml-field full">
+                <label>Dirección</label>
+                <input type="text" id="shipDireccion" placeholder="Calle, Carrera, #, Barrio...">
+              </div>
+              <div class="ml-field">
+                <label>Barrio</label>
+                <input type="text" id="shipBarrio">
+              </div>
+              <div class="ml-field">
+                <label>Ciudad</label>
+                <input type="text" id="shipCiudad" value="Villavicencio">
+              </div>
+              <div class="ml-field full">
+                <label>Referencia (Opcional)</label>
+                <input type="text" id="shipNota" placeholder="Edificio, color de casa, etc.">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ml-card-wrapper">
+          <label class="ml-card" for="radioLocal">
+            <div class="ml-card-header">
+              <div class="ml-radio-area">
+                <input type="radio" id="radioLocal" name="shippingMode" value="local">
+                <span class="ml-card-title">Retirar en un punto de entrega</span>
+              </div>
+              <span class="ml-price">Gratis</span>
+            </div>
+            
+            <div class="ml-card-body">
+              <p class="ml-green-text">A 350 m de tu domicilio</p>
+              <p class="ml-address">MR SmartService - C.C. Los Centauros</p>
+              <p class="ml-sub">Lu a Vi: 8 a 12 hs. Lu a Vi: 14 a 17:30 hs.</p>
+              <a href="#" class="ml-link">Ver punto en el mapa</a>
+            </div>
+          </label>
+        </div>
+
+        <div class="ml-actions-row">
+          <button id="modalEnvioConfirmar" class="btn-ml-continuar" disabled>
+            Continuar
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-ml-sidebar">
+        <div class="ml-summary-card">
+          <h3>Resumen de compra</h3>
+          <hr class="ml-hr">
+          
+          <div class="ml-row">
+            <span>Productos</span>
+            <span id="modalSubtotal">$ 0</span>
+          </div>
+          <div class="ml-row">
+            <span>Envío</span>
+            <span id="summaryShipping">A definir</span>
+          </div>
+          
+          <hr class="ml-hr">
+          
+          <div class="ml-total-row">
+            <span>Total</span>
+            <span id="modalTotal">$ 0</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+  <!-- ========== TOAST GLOBAL ========== -->
+  <div id="appToast" class="toast hidden" aria-live="polite">
+    <span id="appToastMsg"></span>
+  </div>
+
+  <!-- ========== MODAL CONFIRM GLOBAL ========== -->
+  <div id="appConfirm" class="modal-envio hidden" aria-modal="true" role="dialog">
+    <div class="modal-envio-backdrop"></div>
+
+    <div class="modal-envio-dialog modal-confirm-dialog">
+      <h2 id="appConfirmTitle">¿Estás seguro?</h2>
+      <p id="appConfirmMsg" class="modal-confirm-text"></p>
+
+      <div class="modal-confirm-actions">
+        <button id="appConfirmCancel" type="button" class="btn-secondary">
+          Cancelar
+        </button>
+        <button id="appConfirmOk" type="button" class="btn-danger">
+          Aceptar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== FOOTER + JS ========== -->
+  <div id="app-footer"></div>
+  <script src="js/app.config.js?v=48"></script>
+  <script src="js/app.ui.js?v=48"></script>
+  <script src="js/app.catalog.js?v=48"></script>
+  <script src="js/app.cart.js?v=48"></script>
+  <script src="js/app.admin.js?v=48"></script>
+  <script src="js/app.detail.js?v=48"></script>
+  <script src="js/app.home.js?v=48"></script>
+  <script src="js/app.auth.js?v=48"></script>
+  <script src="js/app.footer.js?v=48"></script>
+  <script src="js/app.main.js?v=48"></script>
+
+</body>
+</html>

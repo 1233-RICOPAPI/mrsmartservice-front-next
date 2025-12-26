@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pago aprobado</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:0;background:#f6f7fb;color:#111}
+    .wrap{max-width:920px;margin:0 auto;padding:32px 16px}
+    .card{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.07);padding:22px;margin:14px 0}
+    .ok{display:flex;align-items:center;gap:12px}
+    .badge{width:42px;height:42px;border-radius:999px;background:#e8fff1;display:grid;place-items:center;border:2px solid #40c057}
+    .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    a.btn,button.btn{border:0;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:12px 14px;border-radius:12px;font-weight:700}
+    .btn-primary{background:#1f2937;color:#fff}
+    .btn-ghost{background:#eef2ff;color:#1f2937}
+    .muted{color:#6b7280;font-size:14px}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:8px}
+  </style>
+
+  <!-- Carga tu config para que window.API apunte al Cloud Run correcto -->
+  <script src="js/app.config.js?v=49"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="ok">
+        <div class="badge">✅</div>
+        <div>
+          <h2 style="margin:0">Procesando tu pago…</h2>
+          <div class="muted" id="subtitle">Confirmando con Mercado Pago</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="result" style="display:none">
+      <h3 style="margin:0 0 8px">Listo</h3>
+      <div class="muted" id="meta"></div>
+
+      <div class="btns">
+        <a class="btn btn-primary" id="btnInvoice" href="#" target="_blank" rel="noopener">Descargar factura</a>
+        <a class="btn btn-ghost" id="btnWhats" href="#" target="_blank" rel="noopener">Pedir por WhatsApp</a>
+        <a class="btn btn-ghost" id="btnStore" href="index.html">Volver a la tienda</a>
+      </div>
+
+      <div class="muted" style="margin-top:12px">
+        Si no se abre la factura, copia y pega este link: <br>
+        <code id="invoiceText"></code>
+      </div>
+    </div>
+
+    <div class="card" id="error" style="display:none">
+      <h3 style="margin:0 0 8px;color:#b91c1c">No pudimos confirmar el pago</h3>
+      <div class="muted" id="errText"></div>
+      <div class="btns">
+        <a class="btn btn-primary" href="carrito.html">Volver al carrito</a>
+        <a class="btn btn-ghost" href="index.html">Ir a la tienda</a>
+      </div>
+    </div>
+  </div>
+
+<script>
+  function getParam(name){
+    const u = new URL(window.location.href);
+    return u.searchParams.get(name);
+  }
+
+  function apiBase(){
+    // window.API viene de app.config.js
+    if (window.API) return window.API;
+    // fallback (por si no cargó el config)
+    return 'https://mrsmartservice-256100476140.us-central1.run.app/api';
+  }
+
+  async function confirmPago(paymentId){
+    const url = apiBase().replace(/\/$/, '') + '/payments/confirm';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_id: String(paymentId) })
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = { error: 'bad_response' }; }
+    if (!res.ok) {
+      const err = new Error(data?.error || 'confirm_failed');
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  // WhatsApp (pon aquí tu número con indicativo, sin +)
+  const WHATS_PHONE = (window.WHATSAPP_INVOICE || window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
+
+  // Construir mensaje WhatsApp con datos de la orden + productos + solicitud de datos fiscales
+  async function buildWhatsMsg({ invoiceUrl, orderId, paymentId, statusFromConfirm }){
+    try{
+      // Extraer token desde la URL de la factura (viene del backend)
+      const u = new URL(invoiceUrl);
+      const token = u.searchParams.get('token') || '';
+
+      // Pedimos el JSON de la factura para sacar cliente + items + totales
+      const inv = await (async () => {
+        const url = apiBase().replace(/\/$/, '') + `/invoices/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`;
+        const r2 = await fetch(url);
+        if (!r2.ok) throw new Error('invoice_json_failed');
+        return r2.json();
+      })();
+
+      const order = inv.order || {};
+      const items = Array.isArray(inv.items) ? inv.items : [];
+
+      const moneyCOP = (n) => {
+        try { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits:0 }).format(Number(n||0)); }
+        catch { return '$' + (Number(n||0)||0); }
+      };
+
+      const name  = order.customer_name || order.domicilio_nombre || 'Cliente';
+      const email = order.customer_email || order.payer_email || order.email || '';
+      const tel   = order.customer_phone || order.domicilio_telefono || '';
+      const city  = order.customer_city || order.domicilio_ciudad || '';
+      const addr  = order.customer_address || order.domicilio_direccion || '';
+
+      const modo = String(order.domicilio_modo || '').toLowerCase();
+      let entrega = 'Recoger en tienda';
+      if (modo === 'local') entrega = 'Domicilio (Villavicencio)';
+      else if (modo === 'coordinadora') entrega = 'Envío (Coordinadora)';
+      else if (modo) entrega = 'Entrega: ' + order.domicilio_modo;
+
+      const lines = [];
+      lines.push('Hola, necesito mi factura / confirmación de compra.');
+      lines.push(`Orden #${orderId} · Pago ${paymentId} · Estado: ${order.status || statusFromConfirm}`);
+      lines.push(`Cliente: ${name}${tel ? ' · Tel: ' + tel : ''}${email ? ' · Email: ' + email : ''}`);
+      if (city || addr) lines.push(`Dirección: ${[city, addr].filter(Boolean).join(' / ')}`);
+      lines.push(entrega);
+
+      if (items.length) {
+        lines.push('--- Productos ---');
+        let subtotal = 0;
+        items.forEach((it, idx) => {
+          const qty = Number(it.quantity || 0);
+          const unit = Number(it.unit_price || 0);
+          const totalLine = qty * unit;
+          subtotal += totalLine;
+          lines.push(`${idx+1}) ${it.name || ''} x${qty} · ${moneyCOP(unit)} · ${moneyCOP(totalLine)}`);
+        });
+        const ship = Number(order.domicilio_costo || 0);
+        const total = Number(order.total_amount || (subtotal + ship));
+        lines.push('--- Totales ---');
+        lines.push(`Subtotal: ${moneyCOP(subtotal)}`);
+        if (ship) lines.push(`Domicilio: ${moneyCOP(ship)}`);
+        lines.push(`Total: ${moneyCOP(total)}`);
+      }
+
+      // ✅ Solicitud de datos fiscales (para facturar manual)
+      lines.push('');
+      lines.push('✅ DATOS PARA FACTURACIÓN (por favor responde con esto):');
+      lines.push('1) Nombre completo');
+      lines.push('2) Tipo y número de documento (CC o NIT)');
+      lines.push('3) Razón social (si aplica)');
+      lines.push('4) Correo para factura');
+      lines.push('5) Teléfono');
+      lines.push('6) Dirección + Ciudad');
+      lines.push('');
+      lines.push('Factura: ' + invoiceUrl);
+
+      return lines.join('\n');
+    } catch (e) {
+      // fallback simple (igual pide datos fiscales)
+      return (
+        `Hola, necesito mi factura / confirmación de compra.\n` +
+        `Orden #${orderId} · Pago ${paymentId}.\n\n` +
+        `✅ DATOS PARA FACTURACIÓN (por favor responde con esto):\n` +
+        `1) Nombre completo\n` +
+        `2) Tipo y número de documento (CC o NIT)\n` +
+        `3) Razón social (si aplica)\n` +
+        `4) Correo para factura\n` +
+        `5) Teléfono\n` +
+        `6) Dirección + Ciudad\n\n` +
+        `Factura: ${invoiceUrl}`
+      );
+    }
+  }
+
+  (async function main(){
+    const paymentId = getParam('payment_id') || getParam('collection_id');
+    const subtitle = document.getElementById('subtitle');
+
+    if (!paymentId) {
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errText').textContent = 'Falta payment_id en la URL. (Ej: ?payment_id=123)';
+      subtitle.textContent = 'Faltan datos en la URL';
+      return;
+    }
+
+    try {
+      const r = await confirmPago(paymentId);
+      subtitle.textContent = 'Pago confirmado ✅';
+
+      const invoiceUrl = r.invoice_url;
+      const orderId = r.order_id;
+
+      if (!invoiceUrl) throw new Error('invoice_url_missing');
+
+      // Guarda para que en la tienda puedas mostrar "Última factura"
+      try {
+        localStorage.setItem('last_invoice_url', invoiceUrl);
+        localStorage.setItem('last_order_id', String(orderId));
+        localStorage.setItem('last_payment_id', String(paymentId));
+        localStorage.setItem('last_invoice_at', new Date().toISOString());
+      } catch (e) {}
+
+      // pinta UI
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('meta').innerHTML = `Orden <b>#${orderId}</b> · Estado <b>${r.status}</b> · Payment <b>${paymentId}</b>`;
+
+      const btnInvoice = document.getElementById('btnInvoice');
+      btnInvoice.href = invoiceUrl;
+      document.getElementById('invoiceText').textContent = invoiceUrl;
+
+      // ✅ IMPORTANTE: armar WhatsApp AL CLIC (evita caché y asegura el mensaje completo)
+      const btnWhats = document.getElementById('btnWhats');
+      btnWhats.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        btnWhats.textContent = 'Abriendo WhatsApp...';
+
+        const msg = await buildWhatsMsg({
+          invoiceUrl,
+          orderId,
+          paymentId,
+          statusFromConfirm: r.status
+        });
+
+        const url = `https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank', 'noopener');
+
+        btnWhats.textContent = 'Pedir por WhatsApp';
+      });
+
+    } catch (e) {
+      subtitle.textContent = 'Error al confirmar ❌';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errText').textContent = `${e.message} ${e.data ? JSON.stringify(e.data) : ''}`;
+    }
+  })();
+</script>
+</body>
+</html>

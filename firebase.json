@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "site": "mrsmartservice-decad",
+    "public": "firebase-public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "mrsmartservice-front",
+          "region": "us-central1"
+        }
+      }
+    ]
+  }
+}

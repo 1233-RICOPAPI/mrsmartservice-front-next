@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | MR SmartService</title>
+  <link rel="stylesheet" href="style.css?v=48">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="main-header">
+    <div class="logo-container">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
+      <h1>MR SmartService</h1>
+    </div>
+  </header>
+
+  <section class="login-section">
+    <div class="login-box">
+      <div class="login-icon" id="loginLock">🔒</div>
+
+      <h2>Iniciar sesión</h2>
+      <input type="text" id="usuario" placeholder="Usuario o email" autocomplete="username">
+      <div class="input-group">
+  <input
+    type="password"
+    id="password"
+    placeholder="Contraseña"
+    autocomplete="current-password"
+  >
+  <span id="togglePassword" class="toggle-eye">👁️</span>
+</div>
+
+
+      <button id="btnLogin">Entrar</button>
+      <p id="mensaje"></p>
+      <a href="forgot-password.html" class="link-forgot">¿Olvidaste tu contraseña?</a>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-bottom">
+      <p>© 2025 <strong>MR SmartService</strong>. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+ <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const pass = document.getElementById("password");
+    const eye = document.getElementById("togglePassword");
+
+    eye.addEventListener("click", () => {
+      const isHidden = pass.type === "password";
+      pass.type = isHidden ? "text" : "password";
+      eye.textContent = isHidden ? "🔑" : "👁️";
+    });
+  });
+</script>
+
+  <script src="js/app.config.js?v=48"></script>
+<script src="js/app.ui.js?v=48"></script>
+
+<script src="js/app.catalog.js?v=48"></script>
+<script src="js/app.cart.js?v=48"></script>
+<script src="js/app.admin.js?v=48"></script>
+<script src="js/app.detail.js?v=48"></script>
+<script src="js/app.home.js?v=48"></script>
+<script src="js/app.auth.js?v=48"></script>
+<script src="js/app.footer.js?v=48"></script>
+
+<script src="js/app.main.js?v=48"></script>
+
+
+</body>
+</html>

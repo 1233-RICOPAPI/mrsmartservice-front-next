@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carrito de Compras | MR SmartService</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="style.css?v=48" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;700&family=Open+Sans:wght@400;600;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<header class="main-header">
+  <div class="logo-container">
+    <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img" />
+    <h1>MR SmartService</h1>
+  </div>
+
+  <nav class="main-nav">
+    <a href="index.html">Inicio</a>
+    <a href="contacto.html">Contacto</a>
+    <a href="carrito.html" class="active" style="color: var(--primary);">Carrito</a>
+    <button id="btnAdmin" class="btn-admin">Login</button>
+  </nav>
+</header>
+
+<section class="container" style="padding-top: 3rem;">
+  <div class="cart-card">
+    <header style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="font-family: var(--font-head); color: var(--secondary);">Tu Carrito</h2>
+      <a href="index.html#catalogo" style="color: var(--primary); text-decoration: none; font-size: 0.9rem;">Seguir comprando</a>
+    </header>
+
+    <div id="lista-carrito" class="cart-items">
+      <!-- app.cart.js pinta los items -->
+    </div>
+
+    <div class="cart-summary" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 2rem; text-align: right;">
+      <h3 style="font-size: 1.5rem; color: var(--secondary); margin-bottom: 1rem;">
+        Total: <span id="total" style="color: var(--primary); font-weight: 800;">$0</span>
+      </h3>
+
+      <button id="finalizarCompra" class="btn-primario" style="font-size: 1.1rem; padding: 1rem 2rem;">
+        Finalizar compra
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== MODAL ENVÍO / CHECKOUT ========== -->
+<div id="modalEnvio" class="modal-ml hidden">
+  <div class="modal-ml-backdrop"></div>
+
+  <div class="modal-ml-dialog">
+    <button id="modalEnvioCancelar" class="btn-close-modal">✕</button>
+
+    <div class="modal-ml-grid">
+      <div class="modal-ml-main">
+        <h2 class="ml-title-main">Elige la forma de entrega</h2>
+
+        <div class="ml-card-wrapper">
+          <label class="ml-card" for="radioDom">
+            <div class="ml-card-header">
+              <div class="ml-radio-area">
+                <input type="radio" id="radioDom" name="shippingMode" value="domicilio" />
+                <span class="ml-card-title">Enviar a domicilio</span>
+              </div>
+              <span class="ml-price">-</span>
+            </div>
+
+            <div class="ml-card-body">
+              <p class="ml-address">Villavicencio, Meta</p>
+              <p class="ml-sub">Llega mañana a tu dirección</p>
+            </div>
+          </label>
+
+          <div id="shippingFormWrapper" class="shipping-form-container hidden">
+            <div class="ml-form-grid">
+              <div class="ml-field">
+                <label>Nombre de contacto</label>
+                <input type="text" id="shipNombre" placeholder="Ej: Juan Pérez" />
+              </div>
+
+              <div class="ml-field">
+                <label>Teléfono</label>
+                <input type="tel" id="shipTelefono" placeholder="Ej: 3001234567" />
+              </div>
+
+              <div class="ml-field full">
+                <label>Dirección</label>
+                <input type="text" id="shipDireccion" placeholder="Calle, Carrera, #, Barrio..." />
+              </div>
+
+              <div class="ml-field">
+                <label>Barrio</label>
+                <input type="text" id="shipBarrio" />
+              </div>
+
+              <div class="ml-field">
+                <label>Ciudad</label>
+                <input type="text" id="shipCiudad" value="Villavicencio" />
+              </div>
+
+              <div class="ml-field full">
+                <label>Referencia (Opcional)</label>
+                <input type="text" id="shipNota" placeholder="Edificio, color de casa, etc." />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ml-card-wrapper">
+          <label class="ml-card" for="radioLocal">
+            <div class="ml-card-header">
+              <div class="ml-radio-area">
+                <input type="radio" id="radioLocal" name="shippingMode" value="local" />
+                <span class="ml-card-title">Retirar en un punto de entrega</span>
+              </div>
+              <span class="ml-price">Gratis</span>
+            </div>
+
+            <div class="ml-card-body">
+              <p class="ml-green-text">A 350 m de tu domicilio</p>
+              <p class="ml-address">MR SmartService - C.C. Los Centauros</p>
+              <p class="ml-sub">Lu a Vi: 8 a 12 hs. Lu a Vi: 14 a 17:30 hs.</p>
+              <a href="#" class="ml-link">Ver punto en el mapa</a>
+            </div>
+          </label>
+        </div>
+
+        <div class="ml-actions-row">
+          <button id="modalEnvioConfirmar" class="btn-ml-continuar" disabled>
+            Continuar
+          </button>
+
+          <div id="shippingOutsideNotice" class="ml-alert hidden" style="margin-top:12px; padding:10px 12px; border-radius:10px; background:#fff3f3; color:#b00020; font-size:14px; line-height:1.3;">
+            Por ahora el pago online con domicilio solo está disponible en <b>Villavicencio</b>. Si estás en otro municipio, pronto habilitaremos tarifas.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-ml-sidebar">
+        <div class="ml-summary-card">
+          <h3>Resumen de compra</h3>
+          <hr class="ml-hr" />
+
+          <div class="ml-row">
+            <span>Productos</span>
+            <span id="modalSubtotal">$ 0</span>
+          </div>
+          <div class="ml-row">
+            <span>Envío</span>
+            <span id="summaryShipping">A definir</span>
+          </div>
+
+          <hr class="ml-hr" />
+
+          <div class="ml-total-row">
+            <span>Total</span>
+            <span id="modalTotal">$ 0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="toast hidden" aria-live="polite">
+  <span id="appToastMsg"></span>
+</div>
+
+<div id="app-footer"></div>
+
+<script src="js/app.config.js?v=48"></script>
+<script src="js/app.ui.js?v=48"></script>
+<script src="js/app.catalog.js?v=48"></script>
+<script src="js/app.cart.js?v=48"></script>
+<script src="js/app.admin.js?v=48"></script>
+<script src="js/app.detail.js?v=48"></script>
+<script src="js/app.home.js?v=48"></script>
+<script src="js/app.auth.js?v=48"></script>
+<script src="js/app.footer.js?v=48"></script>
+<script src="js/app.main.js?v=48"></script>
+
+</body>
+</html>

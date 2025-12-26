@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MR SmartService</title>
+
+  <link rel="stylesheet" href="style.css?v=48">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Krub:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700&family=Mozilla+Headline:wght@200..700&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Staatliches&display=swap" rel="stylesheet">
+
+  <!-- ✅ FIXES PRO RESPONSIVE HOME -->
+  <style id="homeResponsiveFixes">
+    /* ===== FIX: Categorías destacadas (desktop) ===== */
+    .home-cats-grid .cat-card{
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      gap:14px;
+      padding:18px 18px;
+      text-align:left;
+    }
+    .home-cats-grid .cat-icon{
+      width:92px;
+      height:92px;
+      flex:0 0 92px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .home-cats-grid .cat-icon img{
+      width:92px;
+      height:92px;
+      object-fit:contain;
+      display:block;
+      margin:0;
+    }
+    .home-cats-grid .cat-info{
+      flex:1;
+      min-width:0; /* clave */
+    }
+    .home-cats-grid .cat-info h3{
+      margin:0 0 6px;
+      line-height:1.15;
+    }
+    .home-cats-grid .cat-info p{
+      margin:0;
+    }
+
+    /* Carrusel (estructura) */
+    .home-cats-scroller{position:relative}
+
+    /* ✅ Flechas: ocultas en desktop */
+    .home-cats-nav{
+      display:none;
+      position:absolute;
+      top:50%;
+      transform:translateY(-50%);
+      width:36px;height:36px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.08);
+      background:#fff;
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      z-index:3;
+    }
+    .home-cats-nav.prev{left:-10px}
+    .home-cats-nav.next{right:-10px}
+
+    /* ✅ Mobile PRO: carrusel bonito + texto NO se corta */
+    @media (max-width: 640px){
+      .home-cats-nav{display:flex}
+
+      .home-cats-grid{
+        display:flex !important;
+        gap:14px !important;
+        overflow-x:auto !important;
+        padding:10px 6px 16px !important;
+        scroll-snap-type:x mandatory;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .home-cats-grid::-webkit-scrollbar{height:6px}
+
+      /* ✅ Card más ancha + fila (img izq / texto der) */
+      .home-cats-grid .cat-card{
+        min-width:260px !important;
+        flex:0 0 260px !important;
+        scroll-snap-align:start;
+        padding:14px 14px !important;
+        border-radius:16px !important;
+
+        display:flex !important;
+        flex-direction:row !important;
+        align-items:center !important;
+        text-align:left !important;
+        gap:12px !important;
+      }
+
+      .home-cats-grid .cat-icon{
+        width:72px !important;
+        height:72px !important;
+        flex:0 0 72px !important;
+      }
+      .home-cats-grid .cat-icon img{
+        width:72px !important;
+        height:72px !important;
+      }
+
+      /* ✅ Clamp 2 líneas (título + descripción) */
+      .home-cats-grid .cat-info h3,
+      .home-cats-grid .cat-info p{
+        overflow:hidden !important;
+        display:-webkit-box !important;
+        -webkit-box-orient:vertical;
+      }
+
+      .home-cats-grid .cat-info h3{
+        font-size:16px !important;
+        margin:0 0 6px !important;
+        -webkit-line-clamp:2;
+      }
+
+      .home-cats-grid .cat-info p{
+        font-size:13px !important;
+        -webkit-line-clamp:2;
+        line-height:1.25 !important;
+      }
+
+      /* flechas sin tapar */
+      .home-cats-nav.prev{left:-4px}
+      .home-cats-nav.next{right:-4px}
+    }
+
+    /* ===== FIX: Publicidad (botón ver más) ===== */
+    .home-ads-actions{display:flex;justify-content:center;margin-top:10px}
+    #btnAdsMore{display:inline-flex}
+  
+
+
+    /* ===== HERO SLIDER PRO ===== */
+    .hero-slider{ position:relative; width:100%; height:100%; }
+    .hero-slide{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit:contain;
+      opacity:0;
+      transform:translateY(6px) scale(.99);
+      transition:opacity .45s ease, transform .45s ease;
+      pointer-events:none;
+    }
+    .hero-slide.active{
+      opacity:1;
+      transform:translateY(0) scale(1);
+      pointer-events:auto;
+    }
+    .hero-arrow{
+      position:absolute; top:50%; transform:translateY(-50%);
+      width:42px; height:42px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.25);
+      background:rgba(0,0,0,.18);
+      color:#fff; font-size:22px; font-weight:900;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; z-index:5;
+      user-select:none;
+    }
+    .hero-arrow.prev{ left:10px; }
+    .hero-arrow.next{ right:10px; }
+
+    .hero-dots{
+      position:absolute; left:0; right:0; bottom:10px;
+      display:flex; justify-content:center; gap:8px;
+      z-index:5;
+    }
+    .hero-dot{
+      width:8px; height:8px; border-radius:999px;
+      background:rgba(255,255,255,.35);
+      border:1px solid rgba(0,0,0,.08);
+      cursor:pointer;
+    }
+    .hero-dot.active{ background:#fff; }
+
+    /* Mobile: flechas un poco más pequeñas */
+    @media (max-width: 640px){
+      .hero-arrow{ width:36px; height:36px; font-size:20px; }
+      .hero-arrow.prev{ left:6px; }
+      .hero-arrow.next{ right:6px; }
+      .hero-dots{ bottom:8px; }
+    }
+  
+
+
+    /* ===== HERO SLIDER FIX (si no aparecen imágenes) ===== */
+    .hero-visual-panel{ position:relative; }
+    .hero-laptop-wrapper{ position:relative; width:100%; height:100%; min-height:320px; }
+    .hero-slider{ position:absolute; inset:0; z-index:3; }
+    .hero-slide{ z-index:3; }
+    /* Si tu neblina tapa, la bajamos */
+    .hero-nebulosa{ z-index:1; pointer-events:none; }
+  </style>
+</head>
+
+<body>
+  <a href="carrito.html" class="cart-float">
+    <img src="images/cart-icon.svg" alt="Carrito de compras">
+    <span id="cart-count">0</span>
+  </a>
+
+  <header class="main-header">
+    <div class="logo-container">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
+      <h1>MR SmartService</h1>
+    </div>
+    <nav class="main-nav">
+      <a href="index.html" class="active">Inicio</a>
+      <a href="contacto.html">Contacto</a>
+      <a href="software.html">Softwares</a>
+      <a href="publicidad.html">Publicidad</a>
+      <a href="carrito.html">Carrito</a>
+      <button id="btnAdmin" class="btn-admin">Login</button>
+    </nav>
+  </header>
+
+  <div class="main-wrapper-gradient">
+    <div class="layout-grid">
+
+      <aside class="main-sidebar">
+        <h3 class="sidebar-head">Categorías</h3>
+        <ul class="category-menu">
+          <li>
+            <a href="index.html?cat=Computadores#catalogo"><span class="cat-icon">💻</span> Computadores</a>
+          </li>
+          <li>
+            <a href="index.html?cat=Componentes#catalogo">
+              <span class="cat-icon">💾</span> Componentes
+            </a>
+          </li>
+          <li>
+            <a href="index.html?cat=Cámaras%20Seguridad#catalogo">
+              <span class="cat-icon">📹</span> Cámaras Seguridad
+            </a>
+          </li>
+          <li>
+            <a href="index.html?cat=Accesorios#catalogo">
+              <span class="cat-icon">🎧</span> Accesorios
+            </a>
+          </li>
+
+          <!-- ✅ FIX: este era el que estaba mal -->
+          <li>
+            <a href="software.html">
+              <span class="cat-icon">🧩</span> Softwares
+            </a>
+          </li>
+
+          <li>
+            <a href="index.html?cat=Impresoras#catalogo">
+              <span class="cat-icon">🖨️</span> Impresoras
+            </a>
+          </li>
+
+          <li class="menu-divider"></li>
+          <li>
+            <a href="#catalogo" class="highlight-link">
+              <span class="cat-icon">🔥</span> Ofertas del Día
+            </a>
+          </li>
+          <li>
+            <a href="contacto.html">
+              <span class="cat-icon">🛠️</span> Servicio Técnico
+            </a>
+          </li>
+        </ul>
+      </aside>
+
+      <main class="main-content-hero">
+        <div class="bg-particles" id="bgParticles"></div>
+
+        <div class="hero-card-integrated">
+          <div class="hero-text-content">
+            <h1>
+              Tu tienda tecnológica con <br /><span>soporte real</span>.
+            </h1>
+            <p>
+              Equipos de cómputo, componentes, accesorios y cámaras de seguridad
+              con asesoría personalizada en Villavicencio.
+            </p>
+            <div class="hero-buttons">
+              <button class="btn-main"
+                onclick="document.getElementById('catalogo').scrollIntoView({behavior: 'smooth'})">
+                Ver catálogo →
+              </button>
+              <button class="btn-sub" onclick="window.location.href='contacto.html'">
+                Hablar con un asesor
+              </button>
+            </div>
+          </div>
+
+          <div class="hero-visual-panel">
+            <div class="hero-nebulosa"></div>
+                        <div class="hero-laptop-wrapper">
+              <!-- HERO SLIDER (agrega/ajusta tus imágenes en /images/) -->
+              <div class="hero-slider" id="heroSlider" aria-label="Slider principal">
+                <!-- ✅ Mantengo tu imagen actual como primera -->
+                <img class="hero-slide active" src="images/laptop-hero.avif" alt="Portátil MR SmartService" loading="eager">
+
+                <!-- ✅ Agrega 3-4 imágenes más (PNG/WebP) -->
+                <img class="hero-slide" src="images/CAMARA2.png" alt="Producto destacado 2" loading="lazy">
+                <img class="hero-slide" src="images/games.png" alt="Producto destacado 3" loading="lazy">
+                <img class="hero-slide" src="images/impresoras.png" alt="Producto destacado 4" loading="lazy">
+                <img class="hero-slide" src="images/componentes.png" alt="Producto destacado 5" loading="lazy">
+
+                <button class="hero-arrow prev" type="button" aria-label="Anterior">‹</button>
+                <button class="hero-arrow next" type="button" aria-label="Siguiente">›</button>
+
+                <div class="hero-dots" aria-label="Indicadores"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <section id="catalogo" class="catalogo-section">
+    <div class="container-fluid">
+
+      <section class="panel">
+        <header class="panel-head">
+          <h2 style="width: 100%; margin-bottom: 1rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">
+            Catálogo Completo
+          </h2>
+
+          <form id="filtrosProd" class="filters">
+            <div class="field grow">
+              <label for="q">Buscar</label>
+              <input id="q" type="search" placeholder="Buscar producto...">
+            </div>
+            <div class="field">
+              <label for="categoriaSelect">Categoría</label>
+              <select id="categoriaSelect">
+                <option value="todos">Todas</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Min</label>
+              <input id="pmin" type="number" placeholder="$0">
+            </div>
+            <div class="field">
+              <label>Max</label>
+              <input id="pmax" type="number" placeholder="$∞">
+            </div>
+            <div class="field" style="display:flex; flex-direction:row; align-items:center; gap:0.5rem; padding-bottom:0.8rem;">
+              <input id="soloDesc" type="checkbox" style="width:auto; margin:0;">
+              <label for="soloDesc" style="margin:0; cursor:pointer;">Ofertas</label>
+            </div>
+            <div class="field">
+              <label for="ordenSelect">Ordenar</label>
+              <select id="ordenSelect">
+                <option value="recent">Recientes</option>
+                <option value="priceAsc">Precio ↑</option>
+                <option value="priceDesc">Precio ↓</option>
+                <option value="nameAsc">Nombre A-Z</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-bottom:2px;">Filtrar</button>
+          </form>
+        </header>
+
+        <div id="productos" class="grid-catalogo"></div>
+
+        <div id="prodEmpty" class="empty-state" hidden>
+          <p>No se encontraron productos.</p>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+  <!-- CATEGORÍAS DESTACADAS -->
+  <section class="home-cats">
+    <div class="home-cats-header">
+      <h2>Categorías destacadas</h2>
+      <a href="index.html#catalogo">Ver todas</a>
+    </div>
+
+    <div class="home-cats-scroller">
+      <button class="home-cats-nav prev" type="button" aria-label="Anterior" data-dir="-1">‹</button>
+      <button class="home-cats-nav next" type="button" aria-label="Siguiente" data-dir="1">›</button>
+
+      <div class="home-cats-grid" id="homeFeaturedCats">
+        <article class="cat-card home-featured-cat" data-cat="Cámaras Seguridad" tabindex="0" role="link" aria-label="Ver Cámaras Seguridad">
+          <div class="cat-icon">
+            <img src="images/camaras.png" alt="Cámaras de seguridad" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Cámaras de seguridad</h3>
+            <p>Instalación y configuración completa.</p>
+          </div>
+        </article>
+
+        <article class="cat-card home-featured-cat" data-cat="Computadoras" tabindex="0" role="link" aria-label="Ver Computadoras">
+          <div class="cat-icon">
+            <img src="images/computadores.png" alt="Computadores" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Computadores</h3>
+            <p>Portátiles y equipos de escritorio.</p>
+          </div>
+        </article>
+
+        <article class="cat-card home-featured-cat" data-cat="Componentes" tabindex="0" role="link" aria-label="Ver Componentes">
+          <div class="cat-icon">
+            <img src="images/componentes.png" alt="Componentes" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Componentes</h3>
+            <p>SSD, RAM, fuentes, gabinetes.</p>
+          </div>
+        </article>
+
+        <article class="cat-card home-featured-cat" data-cat="Accesorios" tabindex="0" role="link" aria-label="Ver Accesorios">
+          <div class="cat-icon">
+            <img src="images/accesorios.png" alt="Accesorios" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Accesorios</h3>
+            <p>Teclados, mouse, audífonos y más.</p>
+          </div>
+        </article>
+
+        <article class="cat-card home-featured-cat" data-cat="Impresoras" tabindex="0" role="link" aria-label="Ver Impresoras">
+          <div class="cat-icon">
+            <img src="images/impresoras.png" alt="Impresoras" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Impresoras</h3>
+            <p>Tinta, láser y multifuncionales.</p>
+          </div>
+        </article>
+
+        <article class="cat-card home-featured-cat" data-cat="Games" tabindex="0" role="link" aria-label="Ver Games">
+          <div class="cat-icon">
+            <img src="images/games.png" alt="Games" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Games</h3>
+            <p>Videojuegos y sus componentes.</p>
+          </div>
+        </article>
+
+        <!-- ✅ Softwares: el JS (goCategory) debe redirigir a software.html -->
+        <article class="cat-card home-featured-cat" data-cat="Softwares" tabindex="0" role="link" aria-label="Ver Softwares">
+          <div class="cat-icon">
+            <img src="images/software.avif" alt="Softwares" loading="lazy">
+          </div>
+          <div class="cat-info">
+            <h3>Softwares</h3>
+            <p>Softwares para tu negocio al mejor precio.</p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+  <!-- PUBLICIDAD HOME (preview) -->
+  <section class="home-section" id="sec-publicidad">
+    <h2>Publicidad y promociones</h2>
+    <p class="home-sub">Videos promocionales de MR SmartService.</p>
+
+    <div id="homeAds" class="home-ads-grid"></div>
+
+    <div class="home-ads-actions">
+      <button id="btnAdsMore" type="button" class="btn btn-ghost">Ver más</button>
+    </div>
+  </section>
+
+  <div id="appToast" class="toast hidden" aria-live="polite">
+    <span id="appToastMsg"></span>
+  </div>
+
+  <div id="appConfirm" class="modal-envio hidden" aria-modal="true" role="dialog">
+    <div class="modal-envio-backdrop"></div>
+    <div class="modal-envio-dialog modal-confirm-dialog">
+      <h2 id="appConfirmTitle">¿Estás seguro?</h2>
+      <p id="appConfirmMsg" class="modal-confirm-text"></p>
+      <div class="modal-confirm-actions">
+        <button id="appConfirmCancel" type="button" class="btn-secondary">Cancelar</button>
+        <button id="appConfirmOk" type="button" class="btn-danger">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BENEFICIOS HOME -->
+  <section class="benefits-section">
+    <div class="benefits-container">
+
+      <div class="benefit-item">
+        <div class="benefit-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/893/893097.png" alt="Pago">
+        </div>
+        <div class="benefit-info">
+          <h3>Paga como quieras</h3>
+          <p>Tarjetas, efectivo o transferencias. Tu dinero siempre está seguro.</p>
+          <a href="info-envios-pagos.html#pagos">Ver medios de pago</a>
+        </div>
+      </div>
+
+      <div class="benefit-item">
+        <div class="benefit-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/709/709790.png" alt="Envío">
+        </div>
+        <div class="benefit-info">
+          <h3>Envío rápido y seguro</h3>
+          <p>Recibe tus productos en Villavicencio y todo el país.</p>
+          <a href="info-envios-pagos.html#envios">Ver costos de envío</a>
+        </div>
+      </div>
+
+      <div class="benefit-item">
+        <div class="benefit-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/1161/1161388.png" alt="Seguridad">
+        </div>
+        <div class="benefit-info">
+          <h3>Compra protegida</h3>
+          <p>¿No es lo que esperabas? Te devolvemos el dinero.</p>
+          <a href="info-envios-pagos.html#proteccion">Cómo te protegemos</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="app-footer"></div>
+
+  <script src="js/app.config.js?v=48"></script>
+  <script src="js/app.ui.js?v=48"></script>
+
+  <script src="js/app.catalog.js?v=48"></script>
+  <script src="js/app.cart.js?v=48"></script>
+  <script src="js/app.admin.js?v=48"></script>
+  <script src="js/app.detail.js?v=48"></script>
+  <script src="js/app.home.js?v=48"></script>
+  <script src="js/app.auth.js?v=48"></script>
+  <script src="js/app.footer.js?v=48"></script>
+
+  <!-- NOTA: app.software.js y app.publicidad.js NO son necesarios en index.html
+       (van en sus páginas respectivas). -->
+  <script src="js/app.main.js?v=48"></script>
+
+  <!-- Scroll reveal para .reveal -->
+  <script>
+    const reveals = document.querySelectorAll(".reveal");
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+
+    reveals.forEach((el) => observer.observe(el));
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const container = document.getElementById('bgParticles');
+      if (!container) return;
+
+      const total = 40;
+      for (let i = 0; i < total; i++) {
+        const dot = document.createElement('span');
+        dot.classList.add('particle');
+        dot.style.left = Math.random() * 100 + 'vw';
+
+        const delay = Math.random() * 8;
+        const duration = 6 + Math.random() * 6;
+
+        dot.style.animationDelay = delay + 's';
+        dot.style.animationDuration = duration + 's';
+
+        const size = 3 + Math.random() * 7;
+        dot.style.width = size + 'px';
+        dot.style.height = size + 'px';
+
+        container.appendChild(dot);
+      }
+    });
+  </script>
+  <!-- HERO SLIDER JS -->
+  <script>
+  (function(){
+    const slider = document.getElementById('heroSlider');
+    if (!slider) return;
+
+    const slides = Array.from(slider.querySelectorAll('.hero-slide'));
+    const btnPrev = slider.querySelector('.hero-arrow.prev');
+    const btnNext = slider.querySelector('.hero-arrow.next');
+    const dotsWrap = slider.querySelector('.hero-dots');
+
+    let i = 0;
+    let timer = null;
+    const INTERVAL = 4000; // 4s pro
+
+    // Crear dots
+    if (dotsWrap){
+      dotsWrap.innerHTML = slides.map((_, idx) =>
+        `<button class="hero-dot ${idx===0?'active':''}" type="button" aria-label="Ir a ${idx+1}"></button>`
+      ).join('');
+    }
+    const dots = dotsWrap ? Array.from(dotsWrap.querySelectorAll('.hero-dot')) : [];
+
+    function show(idx){
+      i = (idx + slides.length) % slides.length;
+      slides.forEach((s, k) => s.classList.toggle('active', k === i));
+      dots.forEach((d, k) => d.classList.toggle('active', k === i));
+    }
+
+    function next(){ show(i + 1); }
+    function prev(){ show(i - 1); }
+
+    function start(){
+      stop();
+      timer = setInterval(next, INTERVAL);
+    }
+    function stop(){
+      if (timer) clearInterval(timer);
+      timer = null;
+    }
+
+    btnNext && btnNext.addEventListener('click', () => { next(); start(); });
+    btnPrev && btnPrev.addEventListener('click', () => { prev(); start(); });
+
+    dots.forEach((d, idx) => d.addEventListener('click', () => { show(idx); start(); }));
+
+    // Pausar en hover/touch
+    slider.addEventListener('mouseenter', stop);
+    slider.addEventListener('mouseleave', start);
+    slider.addEventListener('touchstart', stop, {passive:true});
+    slider.addEventListener('touchend', start, {passive:true});
+
+    show(0);
+    start();
+  })();
+  </script>
+</body>
+</html>
