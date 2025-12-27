@@ -1,33 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-function redirectToIndex(req: NextRequest) {
-  const url = new URL('/index.html', req.url);
-  return NextResponse.redirect(url, 303);
-}
+export async function GET(
+  _request: Request,
+  {
+    params,
+  }: {
+    params: { appKey: string };
+  }
+) {
+  const { appKey } = params;
 
-type Params = { appKey: string };
-type Ctx = { params: Promise<Params> };
+  if (!appKey) {
+    return NextResponse.json(
+      { error: 'appKey requerido' },
+      { status: 400 }
+    );
+  }
 
-export async function GET(req: NextRequest, { params }: Ctx) {
-  const { appKey } = await params;
+  // aquí puedes llamar a tu backend si quieres
+  // await fetch(`${process.env.NEXT_PUBLIC_API_URL}/activate/${appKey}`)
 
-  const res = redirectToIndex(req);
-  res.cookies.set('mr_app', appKey, {
-    path: '/',
-    sameSite: 'lax',
+  return NextResponse.json({
+    success: true,
+    appKey,
   });
-
-  return res;
-}
-
-export async function POST(req: NextRequest, { params }: Ctx) {
-  const { appKey } = await params;
-
-  const res = redirectToIndex(req);
-  res.cookies.set('mr_app', appKey, {
-    path: '/',
-    sameSite: 'lax',
-  });
-
-  return res;
 }
