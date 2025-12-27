@@ -21,7 +21,8 @@
     isPrivateIp;
 
   // URL REAL de Cloud Run (SIN /api al final)
-  const CLOUD_RUN_ORIGIN = (typeof window !== "undefined" && window.__API_ORIGIN__) ? window.__API_ORIGIN__ : "https://mrsmartservice-256100476140.us-central1.run.app";
+  const CLOUD_RUN_ORIGIN =
+    "https://mrsmartservice-256100476140.us-central1.run.app";
 
   // Helpers para normalizar URLs
   const trimSlash = (s) => String(s || "").replace(/\/+$/, "");
