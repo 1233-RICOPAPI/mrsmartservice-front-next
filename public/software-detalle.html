@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Detalles del software | MR SmartService</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="js/app.config.js?v=1"></script>
+
+  <style>
+    .sd-wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+    .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+    .sd-back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:800;color:#1f2937;background:#eef2ff;padding:10px 12px;border-radius:12px}
+    .sd-card{background:#fff;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:18px}
+    .sd-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+    .sd-title{margin:0 0 6px;font-size:30px;letter-spacing:-.02em}
+    .sd-desc{margin:0;color:#6b7280;line-height:1.4}
+    .sd-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .sd-tag{font-size:12px;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#1f2937}
+    .sd-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+    .sd-btn{border:0;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:12px;font-weight:800}
+    .sd-btn.primary{background:#1f2937;color:#fff}
+    .sd-btn.ghost{background:#eef2ff;color:#1f2937}
+
+    .sd-mainimg{width:100%;height:340px;object-fit:contain;border-radius:14px;background:#f6f7fb}
+    .sd-thumbs{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+    .sd-thumb{width:90px;height:68px;object-fit:contain;border-radius:12px;background:#f6f7fb;border:2px solid transparent;cursor:pointer}
+    .sd-thumb.active{border-color:#1f2937}
+
+    .sd-features{margin-top:14px}
+    .sd-features h2{margin:0 0 8px;font-size:18px}
+    .sd-features ul{margin:0;padding-left:18px;color:#6b7280;line-height:1.45}
+    .sd-features p{margin:0;color:#6b7280;line-height:1.45}
+
+    .sd-skeleton{height:22px;background:#f3f4f6;border-radius:8px;margin:8px 0}
+    @media (max-width: 900px){
+      .sd-grid{grid-template-columns:1fr}
+      .sd-title{font-size:26px}
+      .sd-mainimg{height:280px}
+    }
+  </style>
+</head>
+<body>
+  <header class="main-header">
+    <a href="index.html" class="logo-container logo-link">
+      <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
+      <h1>MR SmartService</h1>
+    </a>
+    <nav class="main-nav">
+      <a href="index.html">Inicio</a>
+      <a href="software.html" class="active">Softwares</a>
+      <a href="contacto.html">Contacto</a>
+      <button id="btnAdmin" class="btn-admin">Login</button>
+    </nav>
+  </header>
+
+  <main class="sd-wrap">
+    <div class="sd-head">
+      <a class="sd-back" href="software.html">← Volver</a>
+    </div>
+
+    <section class="sd-card" id="sdCard">
+      <!-- contenido dinámico -->
+      <div class="sd-skeleton" style="width:55%"></div>
+      <div class="sd-skeleton" style="width:85%"></div>
+      <div class="sd-skeleton" style="width:70%"></div>
+    </section>
+  </main>
+
+  <script src="js/app.software_detalle.js?v=1"></script>
+</body>
+</html>

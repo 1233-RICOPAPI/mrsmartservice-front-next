@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#111827"/>
+  <g fill="#e5e7eb" font-family="Arial, sans-serif">
+    <text x="70" y="170" font-size="44" font-weight="800">Producto</text>
+    <text x="70" y="230" font-size="22" fill="#9ca3af">Imagen por defecto</text>
+  </g>
+  <rect x="70" y="270" width="660" height="140" rx="20" fill="#0b0f17" stroke="#334155" stroke-width="4"/>
+</svg>

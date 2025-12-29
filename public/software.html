@@ -23,14 +23,8 @@
     .sw-btn{border:0;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:12px;font-weight:800}
     .sw-btn.primary{background:#1f2937;color:#fff}
     .sw-btn.ghost{background:#eef2ff;color:#1f2937}
-    .sw-note{margin-top:18px;background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:16px}
-    .sw-note h2{margin:0 0 8px;font-size:18px}
-    .sw-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
-    .sw-step{background:#f6f7fb;border-radius:14px;padding:12px}
-    .sw-step b{display:block;margin-bottom:6px}
     @media (max-width: 900px){
       .sw-grid{grid-template-columns:repeat(2,1fr)}
-      .sw-steps{grid-template-columns:1fr}
       .sw-hero h1{font-size:28px}
     }
     @media (max-width: 520px){ .sw-grid{grid-template-columns:1fr} }
@@ -38,10 +32,10 @@
 </head>
 <body>
   <header class="main-header">
-    <div class="logo-container">
+    <a href="index.html" class="logo-container logo-link">
       <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img">
       <h1>MR SmartService</h1>
-    </div>
+    </a>
     <nav class="main-nav">
       <a href="index.html" >Inicio</a>
       <a href="software.html" class="active">Softwares</a>
@@ -57,15 +51,6 @@
 
     <section class="sw-grid" id="swGrid"></section>
 
-    <section class="sw-note">
-      <h2>Entrega automática (futuro)</h2>
-      <p class="muted">Cuando compres, el sistema generará usuario/clave únicos y te dará el instalador.</p>
-      <div class="sw-steps">
-        <div class="sw-step"><b>1) Compra</b>Pagas el software (Mercado Pago).</div>
-        <div class="sw-step"><b>2) Credenciales</b>Se crea usuario y clave únicos (no repetidos).</div>
-        <div class="sw-step"><b>3) Instalador</b>Descargas e ingresas con tus credenciales.</div>
-      </div>
-    </section>
   </main>
 
   <script src="js/app.software.js?v=1"></script>

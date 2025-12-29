@@ -335,6 +335,16 @@ function openCheckoutModal(items) {
   });
   if (ciudadInput) ciudadInput.value = 'Villavicencio';
 
+  // Prefill contacto (para próxima compra)
+  try {
+    const n = localStorage.getItem('billing_name') || '';
+    const t = localStorage.getItem('billing_tel') || '';
+    const elN = document.getElementById('shipNombre');
+    const elT = document.getElementById('shipTelefono');
+    if (elN && !elN.value) elN.value = n;
+    if (elT && !elT.value) elT.value = t;
+  } catch (e) {}
+
   // ===== Prefill: mantener selección de entrega si el usuario cierra/abre de nuevo =====
   const pref = loadShippingPref();
   if (pref) {
@@ -360,7 +370,7 @@ function closeCheckoutModal() {
 /**
  * Recalcula costo de envío y total visual
  * - Villavicencio: domicilio $7.000
- * - Otros municipios: por ahora no disponible en pago online
+ * - Fuera de Villavicencio: contraentrega (sin cobro de envío en la web)
  * - Retiro en punto: gratis
  */
 function recalcularEnvioYTotal() {
@@ -408,12 +418,11 @@ function recalcularEnvioYTotal() {
       }
     } else {
       envioCosto = 0;
-      shippingAllowed = false;
+      // ✅ Fuera de Villavicencio: se maneja contraentrega, sin cobro de envío
+      shippingAllowed = true;
       if (shippingTextEl) {
-        shippingTextEl.textContent =
-          'Por ahora solo tenemos domicilio en Villavicencio. ' +
-          'Para otros municipios, el pago online no está disponible.';
-        shippingTextEl.style.color = '#b00020';
+        shippingTextEl.textContent = 'Contraentrega (fuera de Villavicencio, sin cobro de envío)';
+        shippingTextEl.style.color = '#333';
       }
     }
     if (formWrap) formWrap.classList.remove('hidden');
@@ -433,7 +442,9 @@ function recalcularEnvioYTotal() {
   currentShippingCost = envioCosto;
 
   if (btnConfirmEl) btnConfirmEl.disabled = !shippingAllowed;
-  if (noticeEl) noticeEl.classList.toggle('hidden', shippingAllowed);
+  // Mostrar aviso SOLO cuando es domicilio fuera de Villavicencio
+  const showNotice = Boolean(radioDom && radioDom.checked && !esVillavicencio(ciudad));
+  if (noticeEl) noticeEl.classList.toggle('hidden', !showNotice);
 
   const total = checkoutSubtotal + envioCosto;
   if (totalEl) totalEl.textContent = money(total);
@@ -455,12 +466,6 @@ function collectShippingData(mode) {
   const barrio = (document.getElementById('shipBarrio')?.value || '').trim();
   const ciudad = (document.getElementById('shipCiudad')?.value || '').trim();
 
-  // Por ahora: domicilio SOLO en Villavicencio
-  if (!esVillavicencio(ciudad)) {
-    showToast('Por ahora solo tenemos domicilio en Villavicencio');
-    return null;
-  }
-
   const telefono = (document.getElementById('shipTelefono')?.value || '').trim();
   const nota = (document.getElementById('shipNota')?.value || '').trim();
 
@@ -469,9 +474,11 @@ function collectShippingData(mode) {
     return null;
   }
 
-  let carrier_mode = 'coordinadora';
+  // carrier_mode informativo (se usa para tu lógica futura)
+  // - Villavicencio: domicilio con tarifa fija
+  // - Fuera: contraentrega
+  let carrier_mode = 'contraentrega';
   if (esVillavicencio(ciudad)) carrier_mode = 'villavicencio';
-  else if (esAcacias(ciudad)) carrier_mode = 'acacias';
 
   return {
     mode: 'domicilio',
@@ -488,9 +495,7 @@ function collectShippingData(mode) {
 
 async function startCheckoutWithShipping(mode) {
   if (!shippingAllowed) {
-    showToast(
-      'Por ahora el pago online está disponible solo para Villavicencio o retiro en tienda'
-    );
+    showToast('Elige una forma de entrega válida para continuar');
     return;
   }
 
@@ -503,6 +508,9 @@ async function startCheckoutWithShipping(mode) {
   if (!shipping) return;
 
   try {
+    // Estado visual (confianza)
+    if (typeof showBusy === 'function') showBusy('Procesando pago…');
+
     // Normaliza datos del carrito para evitar ítems inválidos en el backend
     const items = checkoutItems.map((it) => ({
       // El backend acepta product_id (legacy), productId o id. Forzamos a número si aplica.
@@ -542,18 +550,31 @@ async function startCheckoutWithShipping(mode) {
     if (!resp.ok) {
       console.error('Error en checkout:', resp.status, await resp.text());
       showToast('No se pudo iniciar el pago, intenta de nuevo');
+      if (typeof hideBusy === 'function') hideBusy();
       return;
     }
 
     const data = await resp.json();
     if (!data.init_point) {
       showToast('Respuesta inválida de Mercado Pago');
+      if (typeof hideBusy === 'function') hideBusy();
       return;
     }
 
+    // Guardar el checkout para que postpago.html pueda confirmar/crear la orden
+    // (Mercado Pago solo devuelve payment_id en el retorno; los ítems/domicilio los tomamos de aquí)
+    try {
+      localStorage.setItem(
+        'mr_last_checkout',
+        JSON.stringify({ items, shipping, createdAt: new Date().toISOString() })
+      );
+    } catch (e) {}
+
+    if (typeof showBusy === 'function') showBusy('Redirigiendo a Mercado Pago…');
     window.location.href = data.init_point;
   } catch (err) {
     console.error('Error en checkout:', err);
+    if (typeof hideBusy === 'function') hideBusy();
     showToast('Error de conexión al iniciar el pago');
   }
 }
@@ -675,10 +696,18 @@ async function handlePostPaymentReturn() {
     }
     if (!paymentId) return;
 
+    // Confirmación del pago y creación de orden usando el checkout guardado
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem('mr_last_checkout') || 'null'); } catch (e) { last = null; }
+    if (!last || !Array.isArray(last.items) || !last.items.length) {
+      cleanUrlParams();
+      return;
+    }
+
     const confirm = await apiFetch('/payments/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_id: paymentId }),
+      body: JSON.stringify({ payment_id: paymentId, status: 'approved', items: last.items, shipping: last.shipping || null }),
     });
 
     cleanUrlParams();
@@ -688,6 +717,9 @@ async function handlePostPaymentReturn() {
     } catch {}
     try {
       localStorage.removeItem('carrito_entrega');
+    } catch {}
+    try {
+      localStorage.removeItem('mr_last_checkout');
     } catch {}
 
     await showInvoiceModal(confirm);

@@ -16,10 +16,16 @@
     .btn-ghost{background:#eef2ff;color:#1f2937}
     .muted{color:#6b7280;font-size:14px}
     code{background:#f3f4f6;padding:2px 6px;border-radius:8px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .field label{display:block;font-size:12px;color:#6b7280;margin-bottom:6px;font-weight:600}
+    .field input{width:100%;box-sizing:border-box;padding:12px 12px;border-radius:12px;border:1px solid #e5e7eb;background:#f9fafb;outline:none}
+    .field input:focus{border-color:#94a3b8;background:#fff}
+    @media (max-width:700px){.form-grid{grid-template-columns:1fr}}
   </style>
 
   <!-- Carga tu config para que window.API apunte al Cloud Run correcto -->
   <script src="js/app.config.js?v=49"></script>
+  <script src="js/app.ui.js?v=50"></script>
 </head>
 <body>
   <div class="wrap">
@@ -36,6 +42,28 @@
     <div class="card" id="result" style="display:none">
       <h3 style="margin:0 0 8px">Listo</h3>
       <div class="muted" id="meta"></div>
+
+      <div style="margin-top:14px">
+        <div class="muted" style="margin-bottom:8px">Datos para facturación (se enviarán por WhatsApp)</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="billName">Nombre</label>
+            <input id="billName" type="text" placeholder="Tu nombre" />
+          </div>
+          <div class="field">
+            <label for="billNit">NIT / Razón social</label>
+            <input id="billNit" type="text" placeholder="NIT o razón social" />
+          </div>
+          <div class="field">
+            <label for="billEmail">Correo</label>
+            <input id="billEmail" type="email" placeholder="correo@ejemplo.com" />
+          </div>
+          <div class="field">
+            <label for="billTel">Teléfono</label>
+            <input id="billTel" type="tel" placeholder="Ej: 3001234567" />
+          </div>
+        </div>
+      </div>
 
       <div class="btns">
         <a class="btn btn-primary" id="btnInvoice" href="#" target="_blank" rel="noopener">Descargar factura</a>
@@ -72,12 +100,12 @@
     return 'https://mrsmartservice-256100476140.us-central1.run.app/api';
   }
 
-  async function confirmPago(paymentId){
+  async function confirmPago(payload){
     const url = apiBase().replace(/\/$/, '') + '/payments/confirm';
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_id: String(paymentId) })
+      body: JSON.stringify(payload)
     });
     let data = null;
     try { data = await res.json(); } catch (e) { data = { error: 'bad_response' }; }
@@ -93,7 +121,7 @@
   const WHATS_PHONE = (window.WHATSAPP_INVOICE || window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
 
   // Construir mensaje WhatsApp con datos de la orden + productos + solicitud de datos fiscales
-  async function buildWhatsMsg({ invoiceUrl, orderId, paymentId, statusFromConfirm }){
+  async function buildWhatsMsg({ invoiceUrl, orderId, paymentId, statusFromConfirm, billing }){
     try{
       // Extraer token desde la URL de la factura (viene del backend)
       const u = new URL(invoiceUrl);
@@ -121,18 +149,63 @@
       const city  = order.customer_city || order.domicilio_ciudad || '';
       const addr  = order.customer_address || order.domicilio_direccion || '';
 
+      // Helpers para decidir si es Villavicencio (sin acentos)
+      const normalizarCiudad = (c) => String(c || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+      const esVillavicencio = (c) => normalizarCiudad(c) === 'villavicencio';
+
       const modo = String(order.domicilio_modo || '').toLowerCase();
-      let entrega = 'Recoger en tienda';
-      if (modo === 'local') entrega = 'Domicilio (Villavicencio)';
-      else if (modo === 'coordinadora') entrega = 'Envío (Coordinadora)';
-      else if (modo) entrega = 'Entrega: ' + order.domicilio_modo;
+      const shipCity = String(order.domicilio_ciudad || city || '').trim();
+      const shipCost = Number(order.domicilio_costo || 0);
+
+      // Texto de entrega para el admin
+      let entrega = 'Entrega: Recoger en el local (MR SmartService - C.C. Los Centauros)';
+      if (modo === 'domicilio') {
+        if (esVillavicencio(shipCity) && shipCost > 0) {
+          entrega = 'Entrega: Domicilio Villavicencio (+$7.000)';
+        } else {
+          entrega = 'Entrega: Contraentrega (fuera de Villavicencio, sin cobro de envío)';
+        }
+      }
 
       const lines = [];
-      lines.push('Hola, necesito mi factura / confirmación de compra.');
+
+      // Encabezado
+      lines.push('Compra realizada ✅');
+      lines.push(`Cliente: ${billing?.name || name || 'Cliente'}`);
+      lines.push(`NIT/Razón social: ${billing?.nit || 'N/A'}`);
+      lines.push(`Correo: ${billing?.email || email || ''}`);
+      lines.push(`Tel: ${billing?.tel || tel || ''}`);
+      lines.push('');
+
+      lines.push('Detalles de la compra:');
       lines.push(`Orden #${orderId} · Pago ${paymentId} · Estado: ${order.status || statusFromConfirm}`);
-      lines.push(`Cliente: ${name}${tel ? ' · Tel: ' + tel : ''}${email ? ' · Email: ' + email : ''}`);
-      if (city || addr) lines.push(`Dirección: ${[city, addr].filter(Boolean).join(' / ')}`);
       lines.push(entrega);
+
+      // Nota rápida del cobro de envío
+      if (modo === 'domicilio') {
+        if (shipCost > 0) lines.push(`Domicilio: ${moneyCOP(shipCost)}`);
+        else lines.push('Domicilio: $0 (contraentrega)');
+      }
+
+      // Datos de entrega
+      if (modo === 'domicilio') {
+        const dNombre = String(order.domicilio_nombre || '').trim();
+        const dTel = String(order.domicilio_telefono || '').trim();
+        const dDir = String(order.domicilio_direccion || '').trim();
+        const dBarrio = String(order.domicilio_barrio || '').trim();
+        const dNota = String(order.domicilio_nota || '').trim();
+
+        if (dNombre) lines.push(`Contacto: ${dNombre}`);
+        if (dTel) lines.push(`Tel entrega: ${dTel}`);
+        if (shipCity) lines.push(`Ciudad: ${shipCity}`);
+        if (dDir) lines.push(`Dirección: ${dDir}`);
+        if (dBarrio) lines.push(`Barrio: ${dBarrio}`);
+        if (dNota) lines.push(`Referencia: ${dNota}`);
+      }
 
       if (items.length) {
         lines.push('--- Productos ---');
@@ -152,31 +225,26 @@
         lines.push(`Total: ${moneyCOP(total)}`);
       }
 
-      // ✅ Solicitud de datos fiscales (para facturar manual)
-      lines.push('');
-      lines.push('✅ DATOS PARA FACTURACIÓN (por favor responde con esto):');
-      lines.push('1) Nombre completo');
-      lines.push('2) Tipo y número de documento (CC o NIT)');
-      lines.push('3) Razón social (si aplica)');
-      lines.push('4) Correo para factura');
-      lines.push('5) Teléfono');
-      lines.push('6) Dirección + Ciudad');
-      lines.push('');
-      lines.push('Factura: ' + invoiceUrl);
+      // ✅ Datos para facturación (se mandan ya llenos desde este formulario)
+      // (se agregan arriba, antes de productos)
 
       return lines.join('\n');
     } catch (e) {
       // fallback simple (igual pide datos fiscales)
       return (
-        `Hola, necesito mi factura / confirmación de compra.\n` +
-        `Orden #${orderId} · Pago ${paymentId}.\n\n` +
-        `✅ DATOS PARA FACTURACIÓN (por favor responde con esto):\n` +
-        `1) Nombre completo\n` +
-        `2) Tipo y número de documento (CC o NIT)\n` +
-        `3) Razón social (si aplica)\n` +
-        `4) Correo para factura\n` +
-        `5) Teléfono\n` +
-        `6) Dirección + Ciudad\n\n` +
+        `Compra realizada ✅
+` +
+        `Orden #${orderId} · Pago ${paymentId}.
+` +
+        `Cliente: ${billing?.name || ''}
+` +
+        `NIT/Razón social: ${billing?.nit || ''}
+` +
+        `Correo: ${billing?.email || ''}
+` +
+        `Tel: ${billing?.tel || ''}
+
+` +
         `Factura: ${invoiceUrl}`
       );
     }
@@ -184,6 +252,7 @@
 
   (async function main(){
     const paymentId = getParam('payment_id') || getParam('collection_id');
+    const paymentStatus = (getParam('status') || getParam('collection_status') || '').toLowerCase();
     const subtitle = document.getElementById('subtitle');
 
     if (!paymentId) {
@@ -194,8 +263,26 @@
     }
 
     try {
-      const r = await confirmPago(paymentId);
+      if (typeof showBusy === 'function') showBusy('Procesando pago…');
+      if (paymentStatus && paymentStatus !== 'approved') {
+        throw new Error(`Pago no aprobado: ${paymentStatus}`);
+      }
+
+      // Recuperar el checkout guardado desde carrito.html
+      let last = null;
+      try { last = JSON.parse(localStorage.getItem('mr_last_checkout') || 'null'); } catch (e) { last = null; }
+      if (!last || !Array.isArray(last.items) || !last.items.length) {
+        throw new Error('No encontramos los datos de la compra en este navegador (carrito/checkout). Vuelve al carrito e intenta de nuevo.');
+      }
+
+      const r = await confirmPago({
+        payment_id: String(paymentId),
+        status: 'approved',
+        items: last.items,
+        shipping: last.shipping || null,
+      });
       subtitle.textContent = 'Pago confirmado ✅';
+      if (typeof hideBusy === 'function') hideBusy();
 
       const invoiceUrl = r.invoice_url;
       const orderId = r.order_id;
@@ -210,6 +297,13 @@
         localStorage.setItem('last_invoice_at', new Date().toISOString());
       } catch (e) {}
 
+      // Limpieza de carrito SOLO después de pago aprobado
+      try {
+        localStorage.removeItem('carrito');
+        localStorage.removeItem('mr_last_checkout');
+        localStorage.removeItem('carrito_entrega');
+      } catch (e) {}
+
       // pinta UI
       document.getElementById('result').style.display = 'block';
       document.getElementById('meta').innerHTML = `Orden <b>#${orderId}</b> · Estado <b>${r.status}</b> · Payment <b>${paymentId}</b>`;
@@ -218,27 +312,85 @@
       btnInvoice.href = invoiceUrl;
       document.getElementById('invoiceText').textContent = invoiceUrl;
 
+
+      // Prefill datos de facturación desde localStorage
+      const billName = document.getElementById('billName');
+      const billNit  = document.getElementById('billNit');
+      const billEmail= document.getElementById('billEmail');
+      const billTel  = document.getElementById('billTel');
+      try {
+        billName.value  = localStorage.getItem('billing_name')  || '';
+        billNit.value   = localStorage.getItem('billing_nit')   || '';
+        billEmail.value = localStorage.getItem('billing_email') || '';
+        billTel.value   = localStorage.getItem('billing_tel')   || '';
+      } catch (e) {}
+
+      // Guardar datos al escribir (autocompletar próxima compra)
+      const saveBilling = () => {
+        try {
+          localStorage.setItem('billing_name', (billName?.value || '').trim());
+          localStorage.setItem('billing_nit', (billNit?.value || '').trim());
+          localStorage.setItem('billing_email', (billEmail?.value || '').trim());
+          localStorage.setItem('billing_tel', (billTel?.value || '').trim());
+        } catch (e) {}
+      };
+      ;[billName, billNit, billEmail, billTel].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('blur', saveBilling);
+        el.addEventListener('change', saveBilling);
+      });
+
       // ✅ IMPORTANTE: armar WhatsApp AL CLIC (evita caché y asegura el mensaje completo)
       const btnWhats = document.getElementById('btnWhats');
       btnWhats.addEventListener('click', async (ev) => {
         ev.preventDefault();
-        btnWhats.textContent = 'Abriendo WhatsApp...';
+        btnWhats.textContent = 'Redirigiendo a WhatsApp...';
+        if (typeof showBusy === 'function') showBusy('Redirigiendo a WhatsApp…');
+
+        const billing = {
+          name: (document.getElementById('billName')?.value || '').trim(),
+          nit:  (document.getElementById('billNit')?.value || '').trim(),
+          email:(document.getElementById('billEmail')?.value || '').trim(),
+          tel:  (document.getElementById('billTel')?.value || '').trim(),
+        };
+
+        if (!billing.name || !billing.nit || !billing.email || !billing.tel){
+          alert('Por favor completa: Nombre, NIT/Razón social, Correo y Teléfono.');
+          btnWhats.textContent = 'Pedir por WhatsApp';
+          if (typeof hideBusy === 'function') hideBusy();
+          return;
+        }
+
+        // guardar para la próxima compra
+        try {
+          localStorage.setItem('billing_name', billing.name);
+          localStorage.setItem('billing_nit', billing.nit);
+          localStorage.setItem('billing_email', billing.email);
+          localStorage.setItem('billing_tel', billing.tel);
+        } catch (e) {}
 
         const msg = await buildWhatsMsg({
           invoiceUrl,
           orderId,
           paymentId,
-          statusFromConfirm: r.status
+          statusFromConfirm: r.status,
+          billing
         });
 
         const url = `https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}`;
         window.open(url, '_blank', 'noopener');
+
+        // Ocultar loader después de abrir WhatsApp
+        setTimeout(() => {
+          if (typeof hideBusy === 'function') hideBusy();
+        }, 600);
 
         btnWhats.textContent = 'Pedir por WhatsApp';
       });
 
     } catch (e) {
       subtitle.textContent = 'Error al confirmar ❌';
+      if (typeof hideBusy === 'function') hideBusy();
       document.getElementById('error').style.display = 'block';
       document.getElementById('errText').textContent = `${e.message} ${e.data ? JSON.stringify(e.data) : ''}`;
     }

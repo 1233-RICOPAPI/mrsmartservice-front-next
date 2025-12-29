@@ -97,11 +97,32 @@
     if (city || address) custLines.push(`Dirección: ${[city, address].filter(Boolean).join(' / ')}`);
 
     // Modo de entrega
+    const normalizarCiudad = (c) =>
+      String(c || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+
+    const esVillavicencio = (c) => normalizarCiudad(c) === 'villavicencio';
+
     const modo = String(order.domicilio_modo || '').toLowerCase();
-    if (modo === 'local') custLines.push('Entrega: Domicilio (Villavicencio)');
-    else if (modo === 'coordinadora') custLines.push('Entrega: Envío (Coordinadora)');
-    else if (modo) custLines.push(`Entrega: ${order.domicilio_modo}`);
-    else custLines.push('Entrega: Recoger en tienda');
+    const shipCity = String(order.domicilio_ciudad || city || '').trim();
+    const shipCost = Number(order.domicilio_costo || 0);
+
+    if (modo === 'local') {
+      custLines.push('Entrega: Recoger en el local (MR SmartService - C.C. Los Centauros)');
+    } else if (modo === 'domicilio') {
+      if (esVillavicencio(shipCity) && shipCost > 0) {
+        custLines.push('Entrega: Domicilio Villavicencio');
+      } else {
+        custLines.push('Entrega: Contraentrega (fuera de Villavicencio)');
+      }
+    } else if (modo) {
+      custLines.push(`Entrega: ${order.domicilio_modo}`);
+    } else {
+      custLines.push('Entrega: Recoger en el local');
+    }
 
     document.getElementById('invCustomer').textContent = custLines.join(' · ');
 

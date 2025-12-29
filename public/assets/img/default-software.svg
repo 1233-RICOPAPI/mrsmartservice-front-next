@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#111827"/>
+  <rect x="40" y="40" width="720" height="420" rx="24" fill="#0b0f17" stroke="#334155" stroke-width="4"/>
+  <g fill="#e5e7eb" font-family="Arial, sans-serif">
+    <text x="90" y="160" font-size="44" font-weight="700">Software</text>
+    <text x="90" y="220" font-size="24" fill="#9ca3af">Cotiza por WhatsApp</text>
+  </g>
+  <g fill="#22c55e">
+    <circle cx="120" cy="320" r="10"/>
+    <circle cx="160" cy="320" r="10"/>
+    <circle cx="200" cy="320" r="10"/>
+  </g>
+</svg>

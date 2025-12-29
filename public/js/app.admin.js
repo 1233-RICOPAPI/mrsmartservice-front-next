@@ -1541,19 +1541,19 @@ function initUsersAdminUI() {
 
 
 /********************
- * ADMIN DOMICILIOS
+ * ADMIN SOFTWARES (reciclado de "Domicilios")
  ********************/
 
 async function fetchDomicilios() {
   try {
-    const rows = await apiFetch('/orders', {
+    // Mantengo el nombre de la función por compatibilidad con el init del tab,
+    // pero ahora devuelve SOFTWARES.
+    const rows = await apiFetch('/softwares/all', {
       headers: adminAuthHeaders(),
     });
-
-    // Nos quedamos con los que tienen algún modo de domicilio
-    return rows.filter((o) => !!o.domicilio_modo);
+    return Array.isArray(rows) ? rows : [];
   } catch (err) {
-    console.error('Error cargando domicilios:', err);
+    console.error('Error cargando softwares:', err);
     return [];
   }
 }
@@ -1572,30 +1572,35 @@ function renderDomicilios(list) {
   if (empty) empty.hidden = true;
 
   tbody.innerHTML = list
-    .map((d) => {
-      const fecha = d.fecha_domicilio || d.created_at
-        ? new Date(d.fecha_domicilio || d.created_at).toLocaleString('es-CO')
-        : '-';
-
-      const cliente = d.domicilio_nombre || '-';
-      const direccion = d.domicilio_direccion || '-';
-      const ciudadBarrio = `${d.domicilio_ciudad || '-'} / ${d.domicilio_barrio || '-'}`;
-      const tel = d.domicilio_telefono || '-';
-      const estado = d.estado_domicilio || d.status || '-';
+    .map((s) => {
+      const id = s.softwareId ?? s.software_id ?? s.id;
+      const name = s.name || '-';
+      const tags = s.tags || '';
+      const active = (s.active ?? true) ? 'Sí' : 'No';
 
       return `
-        <tr data-id="${d.order_id}">
-          <td>${fecha}</td>
-          <td>${d.order_id}</td>
-          <td>${cliente}</td>
-          <td>${direccion}</td>
-          <td>${ciudadBarrio}</td>
-          <td>${tel}</td>
-          <td>${estado}</td>
+        <tr data-id="${id}">
+          <td>${id}</td>
+          <td>${escapeHtml(name)}</td>
+          <td>${escapeHtml(tags)}</td>
+          <td>${active}</td>
+          <td style="white-space:nowrap">
+            <button type="button" class="btn-secondary btn-edit-sw">Editar</button>
+            <button type="button" class="btn-danger btn-del-sw">Eliminar</button>
+          </td>
         </tr>
       `;
     })
     .join('');
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 async function initDomiciliosUI() {
@@ -1603,9 +1608,109 @@ async function initDomiciliosUI() {
   const btnRef    = document.getElementById('domRefresh');
   const selEstado = document.getElementById('domEstado');
   const inpQuery  = document.getElementById('domQuery');
-  if (!tbody || !btnRef) return;
+
+  // Form
+  const inpId = document.getElementById('swId');
+  const inpName = document.getElementById('swName');
+  const inpShort = document.getElementById('swShort');
+  const inpFeatures = document.getElementById('swFeatures');
+  const inpTags = document.getElementById('swTags');
+  const inpImage = document.getElementById('swImageUrl');
+  const inpFiles = document.getElementById('swImagesFile');
+  const selActive = document.getElementById('swActive');
+  const btnSave = document.getElementById('swSave');
+  const btnClear = document.getElementById('swClear');
+
+  if (!tbody || !btnRef || !btnSave) return;
 
   let all = [];
+
+  function readForm() {
+    return {
+      name: (inpName?.value || '').trim(),
+      short_description: (inpShort?.value || '').trim() || null,
+      features: (inpFeatures?.value || '').trim() || null,
+      tags: (inpTags?.value || '').trim() || null,
+      image_url: (inpImage?.value || '').trim() || null,
+      active: String(selActive?.value || 'true') === 'true',
+    };
+  }
+
+  function fillForm(sw) {
+    if (!sw) return;
+    inpId.value = sw.softwareId ?? sw.software_id ?? sw.id ?? '';
+    inpName.value = sw.name || '';
+    inpShort.value = sw.shortDescription ?? sw.short_description ?? '';
+    inpFeatures.value = sw.features ?? '';
+    inpTags.value = sw.tags ?? '';
+    inpImage.value = sw.imageUrl ?? sw.image_url ?? '';
+    if (inpFiles) inpFiles.value = '';
+    selActive.value = (sw.active ?? true) ? 'true' : 'false';
+    btnSave.textContent = 'Actualizar';
+  }
+
+  function clearForm() {
+    inpId.value = '';
+    inpName.value = '';
+    inpShort.value = '';
+    inpFeatures.value = '';
+    inpTags.value = '';
+    inpImage.value = '';
+    if (inpFiles) inpFiles.value = '';
+    selActive.value = 'true';
+    btnSave.textContent = 'Guardar';
+  }
+
+  function splitUrls(str) {
+    return String(str || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function uniq(arr) {
+    const seen = new Set();
+    const out = [];
+    for (const x of arr) {
+      const k = String(x || '').trim();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      out.push(k);
+    }
+    return out;
+  }
+
+  function authOnlyHeaders() {
+    const t = getToken ? getToken() : null;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  }
+
+  async function uploadImages(files) {
+    const list = Array.from(files || []).filter(Boolean);
+    if (!list.length) return [];
+
+    const uploaded = [];
+    for (const f of list) {
+      const fd = new FormData();
+      fd.append('image', f);
+
+      const res = await fetch(API + '/upload', {
+        method: 'POST',
+        headers: authOnlyHeaders(),
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`upload_failed ${res.status} ${txt}`);
+      }
+
+      const data = await res.json();
+      if (data?.url) uploaded.push(String(data.url));
+    }
+
+    return uploaded;
+  }
 
   async function loadAll() {
     all = await fetchDomicilios();
@@ -1613,23 +1718,19 @@ async function initDomiciliosUI() {
   }
 
   function aplicarFiltros() {
-    const estado = selEstado?.value || 'pendiente';
+    const estado = selEstado?.value || 'activos';
     const q      = (inpQuery?.value || '').toLowerCase().trim();
 
     let list = all.slice();
 
     if (estado !== 'todos') {
-      list = list.filter((d) => (d.estado_domicilio || d.status || '').toLowerCase() === estado.toLowerCase());
+      const wantActive = estado === 'activos';
+      list = list.filter((s) => Boolean(s.active ?? true) === wantActive);
     }
 
     if (q) {
-      list = list.filter((d) => {
-        const txt = [
-          d.domicilio_nombre,
-          d.domicilio_ciudad,
-          d.domicilio_barrio,
-          d.domicilio_direccion,
-        ]
+      list = list.filter((s) => {
+        const txt = [s.name, s.tags, s.shortDescription, s.short_description, s.features]
           .join(' ')
           .toLowerCase();
         return txt.includes(q);
@@ -1639,15 +1740,91 @@ async function initDomiciliosUI() {
     renderDomicilios(list);
   }
 
-  btnRef.addEventListener('click', () => {
-    loadAll();
-  });
-
+  btnRef.addEventListener('click', () => loadAll());
   selEstado?.addEventListener('change', aplicarFiltros);
   inpQuery?.addEventListener('input', () => {
     if (!inpQuery.value) aplicarFiltros();
   });
 
+  btnClear?.addEventListener('click', clearForm);
+
+  btnSave.addEventListener('click', async () => {
+    const dto = readForm();
+    if (!dto.name) {
+      showToast('El nombre es obligatorio', 'error');
+      return;
+    }
+
+    const id = (inpId?.value || '').trim();
+    try {
+      // Si el admin seleccionó archivos, los subimos primero y los añadimos a image_url.
+      const newUrls = inpFiles?.files?.length ? await uploadImages(inpFiles.files) : [];
+      if (newUrls.length) {
+        const current = splitUrls(dto.image_url);
+        dto.image_url = uniq([...current, ...newUrls]).join(', ');
+        // reflejar en el input para que el admin vea las URLs resultantes
+        if (inpImage) inpImage.value = dto.image_url;
+      }
+
+      if (id) {
+        await apiFetch(`/softwares/${id}`, {
+          method: 'PUT',
+          headers: adminAuthHeaders(),
+          body: JSON.stringify(dto),
+        });
+        showToast('Software actualizado', 'success');
+      } else {
+        await apiFetch('/softwares', {
+          method: 'POST',
+          headers: adminAuthHeaders(),
+          body: JSON.stringify(dto),
+        });
+        showToast('Software creado', 'success');
+      }
+      clearForm();
+      await loadAll();
+    } catch (err) {
+      console.error('Error guardando software:', err);
+      showToast('No se pudo guardar el software', 'error');
+    }
+  });
+
+  tbody.addEventListener('click', async (e) => {
+    const btnEdit = e.target.closest('.btn-edit-sw');
+    const btnDel  = e.target.closest('.btn-del-sw');
+    const tr = e.target.closest('tr');
+    const id = tr?.dataset?.id;
+    if (!id) return;
+
+    if (btnEdit) {
+      const sw = all.find((x) => String(x.softwareId ?? x.software_id ?? x.id) === String(id));
+      fillForm(sw);
+      return;
+    }
+
+    if (btnDel) {
+      showConfirm({
+        title: 'Eliminar software',
+        message: '¿Seguro que quieres eliminar este software del catálogo?',
+        onConfirm: async () => {
+          try {
+            await apiFetch(`/softwares/${id}`, {
+              method: 'DELETE',
+              headers: adminAuthHeaders(),
+            });
+            showToast('Software eliminado', 'success');
+            clearForm();
+            await loadAll();
+          } catch (err) {
+            console.error('Error eliminando software:', err);
+            showToast('No se pudo eliminar el software', 'error');
+          }
+        },
+      });
+    }
+  });
+
+  // carga inicial
   loadAll();
 }
 
@@ -1699,6 +1876,14 @@ function initAdminPanel() {
         if (frame && !frame.dataset.loaded) {
           frame.src = 'index.html';
           frame.dataset.loaded = '1';
+        }
+        break;
+      case 'tab-domicilios':
+        // reciclado: Softwares
+        const swPane = document.getElementById('tab-domicilios');
+        if (swPane && !swPane.dataset.loaded) {
+          initDomiciliosUI?.();
+          swPane.dataset.loaded = '1';
         }
         break;
       case 'tab-publicidad':

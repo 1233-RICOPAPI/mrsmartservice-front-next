@@ -173,10 +173,10 @@
 
 <body class="admin-page">
   <header class="main-header">
-    <div class="logo-container">
+    <a href="index.html" class="logo-container logo-link">
       <img src="images/logo.png" alt="Logo MR SmartService" class="logo-img" />
       <h1>MR SmartService</h1>
-    </div>
+    </a>
 
     <nav class="admin-nav" aria-label="Navegación del panel">
       <span class="badge-admin" aria-current="page">Administrador</span>
@@ -222,7 +222,7 @@
           aria-selected="false"
           aria-controls="tab-domicilios"
         >
-          Domicilios
+          Softwares
         </button>
         <!-- Publicidad solo admin/dev -->
         <button
@@ -896,15 +896,63 @@
       >
         <section class="panel">
           <header class="panel-head">
-            <h2>Domicilios</h2>
+            <h2>Softwares</h2>
           </header>
+
+          <!-- Formulario (crear/editar) -->
+          <div class="filters" style="margin-top:0">
+            <div class="field grow">
+              <label for="swName">Nombre</label>
+              <input id="swName" type="text" placeholder="Ej: Software Parqueadero" />
+              <input id="swId" type="hidden" />
+            </div>
+
+            <div class="field grow">
+              <label for="swShort">Descripción corta</label>
+              <input id="swShort" type="text" placeholder="Texto breve para la tarjeta" />
+            </div>
+          </div>
+
+          <div class="filters" style="margin-top:10px">
+            <div class="field grow">
+              <label for="swFeatures">Características / detalles</label>
+              <textarea id="swFeatures" rows="4" placeholder="Escribe las características (una por línea).\nEj:\n- Entradas/salidas\n- Tarifas\n- Reportes" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid #e5e7eb;resize:vertical"></textarea>
+            </div>
+            <div class="field">
+              <label for="swActive">Activo</label>
+              <select id="swActive">
+                <option value="true" selected>Sí</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="filters" style="margin-top:10px">
+            <div class="field grow">
+              <label for="swTags">Tags (separadas por coma)</label>
+              <input id="swTags" type="text" placeholder="Pago único, Offline, Reportes" />
+            </div>
+            <div class="field grow">
+              <label for="swImageUrl">Imagen URL(s) (separadas por coma, opcional)</label>
+              <input id="swImageUrl" type="text" placeholder="https://... , https://..." />
+            </div>
+          </div>
+
+          <div class="filters" style="margin-top:10px">
+            <div class="field grow">
+              <label for="swImagesFile">Subir imágenes (desde tu equipo, opcional)</label>
+              <input id="swImagesFile" type="file" accept="image/*" multiple />
+            </div>
+            <button type="button" id="swSave" class="btn-primary">Guardar</button>
+            <button type="button" id="swClear" class="btn-secondary">Limpiar</button>
+          </div>
 
           <div class="filters">
             <div class="field">
               <label for="domEstado">Estado</label>
               <select id="domEstado">
-                <option value="pendiente">Pendientes</option>
-                <option value="entregado">Entregados</option>
+                <option value="activos" selected>Activos</option>
+                <option value="inactivos">Inactivos</option>
                 <option value="todos">Todos</option>
               </select>
             </div>
@@ -914,7 +962,7 @@
               <input
                 type="search"
                 id="domQuery"
-                placeholder="Nombre, barrio, ciudad…"
+                placeholder="Nombre o tags…"
               />
             </div>
 
@@ -927,20 +975,18 @@
             <table class="smart-table" id="domTable">
               <thead>
                 <tr>
-                  <th scope="col">Fecha</th>
-                  <th scope="col">Orden</th>
-                  <th scope="col">Cliente</th>
-                  <th scope="col">Dirección</th>
-                  <th scope="col">Ciudad/Barrio</th>
-                  <th scope="col">Teléfono</th>
-                  <th scope="col">Estado</th>
+                  <th scope="col">ID</th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Tags</th>
+                  <th scope="col">Activo</th>
+                  <th scope="col">Acciones</th>
                 </tr>
               </thead>
               <tbody id="domTableBody"></tbody>
             </table>
 
             <div id="domEmpty" class="empty-state" hidden>
-              <p>No hay domicilios para mostrar.</p>
+              <p>No hay softwares para mostrar.</p>
             </div>
           </div>
         </section>

@@ -227,3 +227,33 @@ window.WHATSAPP_BUSINESS = '573014190633'; // empresa
 window.COMPANY_EMAIL = 'yesfri@hotmail.es';
 window.COMPANY_PHONE_DISPLAY = '+57 301 419 0633';
 window.COMPANY_FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=61578618060404';
+
+// ================== HEADER: botón Login/Admin (global) ==================
+// En algunas páginas (ej: software.html / publicidad.html) no se carga app.home.js,
+// y el botón #btnAdmin quedaba sin acción. Lo enlazamos aquí para todas.
+(() => {
+  const bindAdminButton = () => {
+    const btn = document.getElementById('btnAdmin');
+    if (!btn) return;
+
+    // Evitar doble binding si otra página ya lo enlazó
+    if (btn.dataset && btn.dataset.bound === '1') return;
+    if (btn.dataset) btn.dataset.bound = '1';
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      try {
+        const hasToken = typeof window.getToken === 'function' && !!window.getToken();
+        window.location.href = hasToken ? 'admin.html' : 'login.html';
+      } catch {
+        window.location.href = 'login.html';
+      }
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindAdminButton);
+  } else {
+    bindAdminButton();
+  }
+})();

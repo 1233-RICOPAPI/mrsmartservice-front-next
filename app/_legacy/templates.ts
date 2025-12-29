@@ -2005,7 +2005,14 @@ export const legacyTemplates: Record<string, LegacyTemplate> = {
   "postpago.html": {
     title: `Pago aprobado`,
     bodyClass: ``,
-    bodyHtml: `<div class="wrap">
+    bodyHtml: `<style>
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .field label{display:block;font-size:12px;color:#6b7280;margin-bottom:6px;font-weight:600}
+    .field input{width:100%;box-sizing:border-box;padding:12px 12px;border-radius:12px;border:1px solid #e5e7eb;background:#f9fafb;outline:none}
+    .field input:focus{border-color:#94a3b8;background:#fff}
+    @media (max-width:700px){.form-grid{grid-template-columns:1fr}}
+    </style>
+<div class="wrap">
     <div class="card">
       <div class="ok">
         <div class="badge">✅</div>
@@ -2019,6 +2026,29 @@ export const legacyTemplates: Record<string, LegacyTemplate> = {
     <div class="card" id="result" style="display:none">
       <h3 style="margin:0 0 8px">Listo</h3>
       <div class="muted" id="meta"></div>
+
+      <div style="margin-top:14px">
+        <div class="muted" style="margin-bottom:8px">Datos para facturación (se enviarán por WhatsApp)</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="billName">Nombre</label>
+            <input id="billName" type="text" placeholder="Tu nombre" />
+          </div>
+          <div class="field">
+            <label for="billNit">NIT / Razón social</label>
+            <input id="billNit" type="text" placeholder="NIT o razón social" />
+          </div>
+          <div class="field">
+            <label for="billEmail">Correo</label>
+            <input id="billEmail" type="email" placeholder="correo@ejemplo.com" />
+          </div>
+          <div class="field">
+            <label for="billTel">Teléfono</label>
+            <input id="billTel" type="tel" placeholder="Ej: 3001234567" />
+          </div>
+        </div>
+      </div>
+
 
       <div class="btns">
         <a class="btn btn-primary" id="btnInvoice" href="#" target="_blank" rel="noopener">Descargar factura</a>
@@ -2042,7 +2072,227 @@ export const legacyTemplates: Record<string, LegacyTemplate> = {
     </div>
   </div>`,
     scripts: [],
-    inlineScripts: ["function getParam(name){\n    const u = new URL(window.location.href);\n    return u.searchParams.get(name);\n  }\n\n  function apiBase(){\n    // window.API viene de app.config.js\n    if (window.API) return window.API;\n    // fallback (por si no cargó el config)\n    return 'https://mrsmartservice-256100476140.us-central1.run.app/api';\n  }\n\n  async function confirmPago(paymentId){\n    const url = apiBase().replace(/\\/$/, '') + '/payments/confirm';\n    const res = await fetch(url, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ payment_id: String(paymentId) })\n    });\n    let data = null;\n    try { data = await res.json(); } catch (e) { data = { error: 'bad_response' }; }\n    if (!res.ok) {\n      const err = new Error(data?.error || 'confirm_failed');\n      err.data = data;\n      throw err;\n    }\n    return data;\n  }\n\n  // WhatsApp (pon aquí tu número con indicativo, sin +)\n  const WHATS_PHONE = (window.WHATSAPP_INVOICE || window.WHATSAPP_BUSINESS || '573014190633').replace(/\\D/g,'');\n\n  // Construir mensaje WhatsApp con datos de la orden + productos + solicitud de datos fiscales\n  async function buildWhatsMsg({ invoiceUrl, orderId, paymentId, statusFromConfirm }){\n    try{\n      // Extraer token desde la URL de la factura (viene del backend)\n      const u = new URL(invoiceUrl);\n      const token = u.searchParams.get('token') || '';\n\n      // Pedimos el JSON de la factura para sacar cliente + items + totales\n      const inv = await (async () => {\n        const url = apiBase().replace(/\\/$/, '') + `/invoices/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`;\n        const r2 = await fetch(url);\n        if (!r2.ok) throw new Error('invoice_json_failed');\n        return r2.json();\n      })();\n\n      const order = inv.order || {};\n      const items = Array.isArray(inv.items) ? inv.items : [];\n\n      const moneyCOP = (n) => {\n        try { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits:0 }).format(Number(n||0)); }\n        catch { return '$' + (Number(n||0)||0); }\n      };\n\n      const name  = order.customer_name || order.domicilio_nombre || 'Cliente';\n      const email = order.customer_email || order.payer_email || order.email || '';\n      const tel   = order.customer_phone || order.domicilio_telefono || '';\n      const city  = order.customer_city || order.domicilio_ciudad || '';\n      const addr  = order.customer_address || order.domicilio_direccion || '';\n\n      const modo = String(order.domicilio_modo || '').toLowerCase();\n      let entrega = 'Recoger en tienda';\n      if (modo === 'local') entrega = 'Domicilio (Villavicencio)';\n      else if (modo === 'coordinadora') entrega = 'Envío (Coordinadora)';\n      else if (modo) entrega = 'Entrega: ' + order.domicilio_modo;\n\n      const lines = [];\n      lines.push('Hola, necesito mi factura / confirmación de compra.');\n      lines.push(`Orden #${orderId} · Pago ${paymentId} · Estado: ${order.status || statusFromConfirm}`);\n      lines.push(`Cliente: ${name}${tel ? ' · Tel: ' + tel : ''}${email ? ' · Email: ' + email : ''}`);\n      if (city || addr) lines.push(`Dirección: ${[city, addr].filter(Boolean).join(' / ')}`);\n      lines.push(entrega);\n\n      if (items.length) {\n        lines.push('--- Productos ---');\n        let subtotal = 0;\n        items.forEach((it, idx) => {\n          const qty = Number(it.quantity || 0);\n          const unit = Number(it.unit_price || 0);\n          const totalLine = qty * unit;\n          subtotal += totalLine;\n          lines.push(`${idx+1}) ${it.name || ''} x${qty} · ${moneyCOP(unit)} · ${moneyCOP(totalLine)}`);\n        });\n        const ship = Number(order.domicilio_costo || 0);\n        const total = Number(order.total_amount || (subtotal + ship));\n        lines.push('--- Totales ---');\n        lines.push(`Subtotal: ${moneyCOP(subtotal)}`);\n        if (ship) lines.push(`Domicilio: ${moneyCOP(ship)}`);\n        lines.push(`Total: ${moneyCOP(total)}`);\n      }\n\n      // ✅ Solicitud de datos fiscales (para facturar manual)\n      lines.push('');\n      lines.push('✅ DATOS PARA FACTURACIÓN (por favor responde con esto):');\n      lines.push('1) Nombre completo');\n      lines.push('2) Tipo y número de documento (CC o NIT)');\n      lines.push('3) Razón social (si aplica)');\n      lines.push('4) Correo para factura');\n      lines.push('5) Teléfono');\n      lines.push('6) Dirección + Ciudad');\n      lines.push('');\n      lines.push('Factura: ' + invoiceUrl);\n\n      return lines.join('\\n');\n    } catch (e) {\n      // fallback simple (igual pide datos fiscales)\n      return (\n        `Hola, necesito mi factura / confirmación de compra.\\n` +\n        `Orden #${orderId} · Pago ${paymentId}.\\n\\n` +\n        `✅ DATOS PARA FACTURACIÓN (por favor responde con esto):\\n` +\n        `1) Nombre completo\\n` +\n        `2) Tipo y número de documento (CC o NIT)\\n` +\n        `3) Razón social (si aplica)\\n` +\n        `4) Correo para factura\\n` +\n        `5) Teléfono\\n` +\n        `6) Dirección + Ciudad\\n\\n` +\n        `Factura: ${invoiceUrl}`\n      );\n    }\n  }\n\n  (async function main(){\n    const paymentId = getParam('payment_id') || getParam('collection_id');\n    const subtitle = document.getElementById('subtitle');\n\n    if (!paymentId) {\n      document.getElementById('error').style.display = 'block';\n      document.getElementById('errText').textContent = 'Falta payment_id en la URL. (Ej: ?payment_id=123)';\n      subtitle.textContent = 'Faltan datos en la URL';\n      return;\n    }\n\n    try {\n      const r = await confirmPago(paymentId);\n      subtitle.textContent = 'Pago confirmado ✅';\n\n      const invoiceUrl = r.invoice_url;\n      const orderId = r.order_id;\n\n      if (!invoiceUrl) throw new Error('invoice_url_missing');\n\n      // Guarda para que en la tienda puedas mostrar \"Última factura\"\n      try {\n        localStorage.setItem('last_invoice_url', invoiceUrl);\n        localStorage.setItem('last_order_id', String(orderId));\n        localStorage.setItem('last_payment_id', String(paymentId));\n        localStorage.setItem('last_invoice_at', new Date().toISOString());\n      } catch (e) {}\n\n      // pinta UI\n      document.getElementById('result').style.display = 'block';\n      document.getElementById('meta').innerHTML = `Orden <b>#${orderId}</b> · Estado <b>${r.status}</b> · Payment <b>${paymentId}</b>`;\n\n      const btnInvoice = document.getElementById('btnInvoice');\n      btnInvoice.href = invoiceUrl;\n      document.getElementById('invoiceText').textContent = invoiceUrl;\n\n      // ✅ IMPORTANTE: armar WhatsApp AL CLIC (evita caché y asegura el mensaje completo)\n      const btnWhats = document.getElementById('btnWhats');\n      btnWhats.addEventListener('click', async (ev) => {\n        ev.preventDefault();\n        btnWhats.textContent = 'Abriendo WhatsApp...';\n\n        const msg = await buildWhatsMsg({\n          invoiceUrl,\n          orderId,\n          paymentId,\n          statusFromConfirm: r.status\n        });\n\n        const url = `https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}`;\n        window.open(url, '_blank', 'noopener');\n\n        btnWhats.textContent = 'Pedir por WhatsApp';\n      });\n\n    } catch (e) {\n      subtitle.textContent = 'Error al confirmar ❌';\n      document.getElementById('error').style.display = 'block';\n      document.getElementById('errText').textContent = `${e.message} ${e.data ? JSON.stringify(e.data) : ''}`;\n    }\n  })();"],
+    inlineScripts: ["function getParam(name){
+    const u = new URL(window.location.href);
+    return u.searchParams.get(name);
+  }
+
+  function apiBase(){
+    // window.API viene de app.config.js
+    if (window.API) return window.API;
+    // fallback (por si no cargó el config)
+    return 'https://mrsmartservice-256100476140.us-central1.run.app/api';
+  }
+
+  async function confirmPago(paymentId){
+    const url = apiBase().replace(/\\/$/, '') + '/payments/confirm';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_id: String(paymentId) })
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = { error: 'bad_response' }; }
+    if (!res.ok) {
+      const err = new Error(data?.error || 'confirm_failed');
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  // WhatsApp (pon aquí tu número con indicativo, sin +)
+  const WHATS_PHONE = (window.WHATSAPP_INVOICE || window.WHATSAPP_BUSINESS || '573014190633').replace(/\\D/g,'');
+
+  // Construir mensaje WhatsApp con datos de la orden + productos + solicitud de datos fiscales
+  async function buildWhatsMsg({ invoiceUrl, orderId, paymentId, statusFromConfirm, billing }){
+    try{
+      // Extraer token desde la URL de la factura (viene del backend)
+      const u = new URL(invoiceUrl);
+      const token = u.searchParams.get('token') || '';
+
+      // Pedimos el JSON de la factura para sacar cliente + items + totales
+      const inv = await (async () => {
+        const url = apiBase().replace(/\\/$/, '') + \\`/invoices/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}\\`;
+        const r2 = await fetch(url);
+        if (!r2.ok) throw new Error('invoice_json_failed');
+        return r2.json();
+      })();
+
+      const order = inv.order || {};
+      const items = Array.isArray(inv.items) ? inv.items : [];
+
+      const moneyCOP = (n) => {
+        try { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits:0 }).format(Number(n||0)); }
+        catch { return '$' + (Number(n||0)||0); }
+      };
+
+      const name  = order.customer_name || order.domicilio_nombre || 'Cliente';
+      const email = order.customer_email || order.payer_email || order.email || '';
+      const tel   = order.customer_phone || order.domicilio_telefono || '';
+      const city  = order.customer_city || order.domicilio_ciudad || '';
+      const addr  = order.customer_address || order.domicilio_direccion || '';
+
+      const modo = String(order.domicilio_modo || '').toLowerCase();
+      let entrega = 'Recoger en tienda';
+      if (modo === 'local') entrega = 'Domicilio (Villavicencio)';
+      else if (modo === 'coordinadora') entrega = 'Envío (Coordinadora)';
+      else if (modo) entrega = 'Entrega: ' + order.domicilio_modo;
+
+      const lines = [];
+
+      // Encabezado
+      lines.push('Compra realizada ✅');
+      lines.push(\\`Cliente: ${billing?.name || name || 'Cliente'}\\`);
+      lines.push(\\`NIT/Razón social: ${billing?.nit || 'N/A'}\\`);
+      lines.push(\\`Correo: ${billing?.email || email || ''}\\`);
+      lines.push(\\`Tel: ${billing?.tel || tel || ''}\\`);
+      lines.push('');
+
+      lines.push('Detalles de la compra:');
+      lines.push(\\`Orden #${orderId} · Pago ${paymentId} · Estado: ${order.status || statusFromConfirm}\\`);
+      if (city || addr) lines.push(\\`Dirección: ${[city, addr].filter(Boolean).join(' / ')}\\`);
+      lines.push(entrega);
+
+      if (items.length) {
+        lines.push('--- Productos ---');
+        let subtotal = 0;
+        items.forEach((it, idx) => {
+          const qty = Number(it.quantity || 0);
+          const unit = Number(it.unit_price || 0);
+          const totalLine = qty * unit;
+          subtotal += totalLine;
+          lines.push(\\`${idx+1}) ${it.name || ''} x${qty} · ${moneyCOP(unit)} · ${moneyCOP(totalLine)}\\`);
+        });
+        const ship = Number(order.domicilio_costo || 0);
+        const total = Number(order.total_amount || (subtotal + ship));
+        lines.push('--- Totales ---');
+        lines.push(\\`Subtotal: ${moneyCOP(subtotal)}\\`);
+        if (ship) lines.push(\\`Domicilio: ${moneyCOP(ship)}\\`);
+        lines.push(\\`Total: ${moneyCOP(total)}\\`);
+      }
+
+      // ✅ Datos para facturación (se mandan ya llenos desde este formulario)
+      // (se agregan arriba, antes de productos)
+
+      return lines.join('\\n');
+    } catch (e) {
+      // fallback simple (igual pide datos fiscales)
+      return (
+        \\`Compra realizada ✅
+\\` +
+        \\`Orden #${orderId} · Pago ${paymentId}.
+\\` +
+        \\`Cliente: ${billing?.name || ''}
+\\` +
+        \\`NIT/Razón social: ${billing?.nit || ''}
+\\` +
+        \\`Correo: ${billing?.email || ''}
+\\` +
+        \\`Tel: ${billing?.tel || ''}
+
+\\` +
+        \\`Factura: ${invoiceUrl}\\`
+      );
+    }
+  }
+
+  (async function main(){
+    const paymentId = getParam('payment_id') || getParam('collection_id');
+    const subtitle = document.getElementById('subtitle');
+
+    if (!paymentId) {
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errText').textContent = 'Falta payment_id en la URL. (Ej: ?payment_id=123)';
+      subtitle.textContent = 'Faltan datos en la URL';
+      return;
+    }
+
+    try {
+      const r = await confirmPago(paymentId);
+      subtitle.textContent = 'Pago confirmado ✅';
+
+      const invoiceUrl = r.invoice_url;
+      const orderId = r.order_id;
+
+      if (!invoiceUrl) throw new Error('invoice_url_missing');
+
+      // Guarda para que en la tienda puedas mostrar \"Última factura\"
+      try {
+        localStorage.setItem('last_invoice_url', invoiceUrl);
+        localStorage.setItem('last_order_id', String(orderId));
+        localStorage.setItem('last_payment_id', String(paymentId));
+        localStorage.setItem('last_invoice_at', new Date().toISOString());
+      } catch (e) {}
+
+      // pinta UI
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('meta').innerHTML = \\`Orden <b>#${orderId}</b> · Estado <b>${r.status}</b> · Payment <b>${paymentId}</b>\\`;
+
+      const btnInvoice = document.getElementById('btnInvoice');
+      btnInvoice.href = invoiceUrl;
+      document.getElementById('invoiceText').textContent = invoiceUrl;
+
+
+      // Prefill datos de facturación desde localStorage
+      const billName = document.getElementById('billName');
+      const billNit  = document.getElementById('billNit');
+      const billEmail= document.getElementById('billEmail');
+      const billTel  = document.getElementById('billTel');
+      try {
+        billName.value  = localStorage.getItem('billing_name')  || '';
+        billNit.value   = localStorage.getItem('billing_nit')   || '';
+        billEmail.value = localStorage.getItem('billing_email') || '';
+        billTel.value   = localStorage.getItem('billing_tel')   || '';
+      } catch (e) {}
+
+      // ✅ IMPORTANTE: armar WhatsApp AL CLIC (evita caché y asegura el mensaje completo)
+      const btnWhats = document.getElementById('btnWhats');
+      btnWhats.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        btnWhats.textContent = 'Abriendo WhatsApp...';
+
+        const billing = {
+          name: (document.getElementById('billName')?.value || '').trim(),
+          nit:  (document.getElementById('billNit')?.value || '').trim(),
+          email:(document.getElementById('billEmail')?.value || '').trim(),
+          tel:  (document.getElementById('billTel')?.value || '').trim(),
+        };
+
+        if (!billing.name || !billing.nit || !billing.email || !billing.tel){
+          alert('Por favor completa: Nombre, NIT/Razón social, Correo y Teléfono.');
+          btnWhats.textContent = 'Pedir por WhatsApp';
+          return;
+        }
+
+        // guardar para la próxima compra
+        try {
+          localStorage.setItem('billing_name', billing.name);
+          localStorage.setItem('billing_nit', billing.nit);
+          localStorage.setItem('billing_email', billing.email);
+          localStorage.setItem('billing_tel', billing.tel);
+        } catch (e) {}
+
+        const msg = await buildWhatsMsg({
+          invoiceUrl,
+          orderId,
+          paymentId,
+          statusFromConfirm: r.status,
+          billing
+        });
+
+        const url = \\`https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}\\`;
+        window.open(url, '_blank', 'noopener');
+
+        btnWhats.textContent = 'Pedir por WhatsApp';
+      });
+
+    } catch (e) {
+      subtitle.textContent = 'Error al confirmar ❌';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('errText').textContent = \\`${e.message} ${e.data ? JSON.stringify(e.data) : ''}\\`;
+    }
+  })();"],
   },
   "publicidad.html": {
     title: `Publicidad | MR SmartService`,
