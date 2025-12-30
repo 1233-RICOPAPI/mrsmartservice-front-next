@@ -2,8 +2,8 @@
   const card = document.getElementById('sdCard');
   if (!card) return;
 
-  const wa = (window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
-  const DEFAULT_IMG = 'images/software.avif';
+  const wa = (window.WHATSAPP_BUSINESS || window.MR_CONFIG?.WHATSAPP_NUMBER || '573014190633').replace(/\D/g,'');
+  const DEFAULT_IMG = window.MR_CONFIG?.DEFAULT_SOFTWARE_IMG || '/assets/img/default-software.svg';
 
   const fallback = {
     'parqueadero': {
@@ -39,11 +39,18 @@
     return String(tags).split(',').map(s=>s.trim()).filter(Boolean);
   }
 
+  function resolveImg(u){
+    const resolved = (window.MR_UTIL?.resolveMediaUrl)
+      ? window.MR_UTIL.resolveMediaUrl(u)
+      : (u || '');
+    return resolved || DEFAULT_IMG;
+  }
+
   function splitImages(imageUrl){
-    const raw = (imageUrl || '').trim();
+    const raw = String(imageUrl || '').trim();
     if (!raw) return [DEFAULT_IMG];
     // Permitimos varias URLs separadas por coma (se guarda en el mismo campo para no migrar BD)
-    const list = raw.split(',').map(s=>s.trim()).filter(Boolean);
+    const list = raw.split(',').map(s=>s.trim()).filter(Boolean).map(resolveImg);
     return list.length ? list : [DEFAULT_IMG];
   }
 
@@ -52,10 +59,10 @@
     return {
       id,
       name: sw.name || '',
-      shortDescription: sw.shortDescription ?? sw.short_description ?? '',
+      shortDescription: sw.shortDescription ?? sw.short_description ?? sw.desc ?? sw.description ?? '',
       features: sw.features ?? '',
       tags: splitTags(sw.tags),
-      imageUrl: sw.imageUrl ?? sw.image_url ?? '',
+      imageUrl: sw.imageUrl ?? sw.image_url ?? sw.img ?? '',
     };
   }
 
@@ -67,7 +74,6 @@
     const txt = String(features || '').trim();
     if (!txt) return '<p>Escríbenos por WhatsApp y te contamos todo (precio, requisitos e instalación).</p>';
 
-    // si viene como lista con saltos de línea, lo mostramos como bullets
     const lines = txt
       .split(/\r?\n/)
       .map(l => l.trim())

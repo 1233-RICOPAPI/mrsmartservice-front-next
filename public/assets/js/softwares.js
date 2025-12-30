@@ -26,7 +26,8 @@ Mi nombre es: ${buyerName || ''} – Tel: ${buyerPhone || ''}` : '';
   }
 
   function card(s) {
-    const img = s.image_url || window.MR_CONFIG.DEFAULT_SOFTWARE_IMG;
+    const img = (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(s.image_url) : (s.image_url || ''))
+      || window.MR_CONFIG.DEFAULT_SOFTWARE_IMG;
     const tags = (s.tags || '').split(',').map(x=>x.trim()).filter(Boolean);
     return `
       <div class="card">

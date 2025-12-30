@@ -6470,4 +6470,15 @@ body.admin-page #tab-perfil.active { display: grid !important; }
   cursor:pointer;
 }
 .hero-dot.active{ background:#fff; }
+.logo-img{
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.logo-circle{
+  border-radius: 999px;
+  background: #fff;
+}
+
 

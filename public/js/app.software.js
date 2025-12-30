@@ -2,8 +2,8 @@
   const grid = document.getElementById('swGrid');
   if (!grid) return;
 
-  const wa = (window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
-  const DEFAULT_IMG = 'images/software.avif';
+  const wa = (window.WHATSAPP_BUSINESS || window.MR_CONFIG?.WHATSAPP_NUMBER || '573014190633').replace(/\D/g,'');
+  const DEFAULT_IMG = window.MR_CONFIG?.DEFAULT_SOFTWARE_IMG || '/assets/img/default-software.svg';
 
   // Fallback local (si la API aún no tiene softwares cargados)
   const fallback = [
@@ -42,12 +42,16 @@
       .filter(Boolean);
   }
 
+  function resolveImg(url){
+    return (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(url) : (url || '')) || DEFAULT_IMG;
+  }
+
   function normalize(sw){
     const id = sw.softwareId ?? sw.software_id ?? sw.id ?? sw.slug ?? '';
     const name = sw.name || '';
     const desc = sw.shortDescription ?? sw.short_description ?? sw.desc ?? sw.description ?? '';
     const features = sw.features ?? '';
-    const img = sw.imageUrl ?? sw.image_url ?? sw.img ?? DEFAULT_IMG;
+    const img = resolveImg(sw.imageUrl ?? sw.image_url ?? sw.img);
     const tags = splitTags(sw.tags);
     return { id, name, desc, features, img, tags };
   }
@@ -83,6 +87,7 @@
 
   async function init(){
     try {
+      // Nota: apiFetch usa /api/... por debajo, por eso aquí NO ponemos /api
       const data = await (window.apiFetch ? window.apiFetch('/softwares') : Promise.resolve(null));
       const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
       render(list.length ? list : fallback);

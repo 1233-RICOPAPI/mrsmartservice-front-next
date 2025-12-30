@@ -17,5 +17,14 @@
     return String(s || '').trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
   }
 
-  window.MR_UTIL = { fmtCOP, openWhatsApp, normalizeCity };
+  function resolveMediaUrl(url) {
+    // Preferimos el helper global si existe
+    if (window.MR_CONFIG && typeof window.MR_CONFIG.resolveMediaUrl === 'function') {
+      return window.MR_CONFIG.resolveMediaUrl(url);
+    }
+    const s = String(url || '').trim();
+    return s || '';
+  }
+
+  window.MR_UTIL = { fmtCOP, openWhatsApp, normalizeCity, resolveMediaUrl };
 })();

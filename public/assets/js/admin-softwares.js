@@ -14,6 +14,7 @@
   }
 
   let currentId = null;
+  let isSaving = false;
 
   function setMsg(t, ok) {
     elMsg.textContent = t || '';
@@ -90,7 +91,10 @@
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
+    if (isSaving) return;
     setMsg('');
+
+    const btn = form.querySelector('button[type="submit"]');
     const payload = {
       name: form.name.value.trim(),
       short_description: form.short_description.value.trim(),
@@ -108,6 +112,8 @@
     }
 
     try {
+      isSaving = true;
+      if (btn) btn.disabled = true;
       if (currentId) {
         await window.MR_API.put(`/api/softwares/${currentId}`, payload);
         setMsg('Actualizado ✅', true);
@@ -119,6 +125,9 @@
       load();
     } catch (e) {
       setMsg(e.message, false);
+    } finally {
+      isSaving = false;
+      if (btn) btn.disabled = false;
     }
   });
 

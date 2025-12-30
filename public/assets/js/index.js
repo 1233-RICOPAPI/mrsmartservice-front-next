@@ -18,11 +18,12 @@
     const price = Number(p.price || 0);
     const disc = Number(p.discount_percent || 0);
     const final = disc > 0 ? Math.round(price * (1 - disc / 100)) : price;
-    const img = p.image_url || window.MR_CONFIG.DEFAULT_PRODUCT_IMG;
+    const img = (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(p.image_url) : (p.image_url || ''))
+      || window.MR_CONFIG.DEFAULT_PRODUCT_IMG;
     return `
       <div class="card">
         <div class="card-body">
-          <img src="${img}" alt="${(p.name||'Producto')}">
+          <img src="${img}" alt="${(p.name||'Producto')}" onerror="this.src='${window.MR_CONFIG.DEFAULT_PRODUCT_IMG}'">
           <div style="display:flex;justify-content:space-between;gap:8px;">
             <div>
               <div class="h2">${p.name || 'Producto'}</div>
