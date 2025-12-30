@@ -43,7 +43,26 @@
   }
 
   function resolveImg(url){
-    return (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(url) : (url || '')) || DEFAULT_IMG;
+    const u = String(url || '').trim();
+    if (!u) return DEFAULT_IMG;
+    if (/^(https?:\/\/|data:|blob:)/i.test(u)) return u;
+
+    // Si el backend guarda rutas relativas (uploads/.. o /uploads/..),
+    // en Vercel eso apunta al front y da 404. Aquí las convertimos a URL
+    // absoluta del backend (API_BASE sin /api).
+    const apiBase = String(window.MR_CONFIG?.API_BASE || '').trim();
+    const apiOrigin = apiBase.replace(/\/api\/?$/, '');
+    const isUpload = u.startsWith('/uploads') || u.startsWith('uploads/');
+    if (isUpload && apiOrigin) {
+      const path = u.startsWith('/') ? u : `/${u}`;
+      return `${apiOrigin}${path}`;
+    }
+
+    // Fallback al resolutor si existe
+    if (window.MR_UTIL?.resolveMediaUrl) {
+      return window.MR_UTIL.resolveMediaUrl(u) || DEFAULT_IMG;
+    }
+    return u;
   }
 
   function normalize(sw){

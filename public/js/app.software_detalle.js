@@ -40,9 +40,26 @@
   }
 
   function resolveImg(u){
-    const resolved = (window.MR_UTIL?.resolveMediaUrl)
-      ? window.MR_UTIL.resolveMediaUrl(u)
-      : (u || '');
+    const raw = String(u || '').trim();
+    if (!raw) return DEFAULT_IMG;
+    if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
+
+    const apiBase = String(window.MR_CONFIG?.API_BASE || '').replace(/\/+$/,'');
+    const apiOrigin = apiBase.replace(/\/api$/,'');
+    const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
+
+    // /uploads/... debe venir del backend, no de Vercel
+    if (withSlash.startsWith('/uploads/')) {
+      return apiOrigin ? `${apiOrigin}${withSlash}` : withSlash;
+    }
+
+    // Si en BD guardaste sin el prefijo, asumimos carpeta uploads
+    if (!withSlash.includes('/')) {
+      return apiOrigin ? `${apiOrigin}/uploads/${raw}` : `/uploads/${raw}`;
+    }
+
+    // fallback a utilidad si existe
+    const resolved = (window.MR_UTIL?.resolveMediaUrl) ? window.MR_UTIL.resolveMediaUrl(raw) : raw;
     return resolved || DEFAULT_IMG;
   }
 
