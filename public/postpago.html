@@ -97,7 +97,9 @@
     // window.API viene de app.config.js
     if (window.API) return window.API;
     // fallback (por si no cargó el config)
-    return 'https://mrsmartservice-256100476140.us-central1.run.app/api';
+    // En producción, usa el mismo origen del front ("/api") y deja que Vercel
+    // haga el rewrite hacia Cloud Run (ver vercel.json).
+    return `${location.origin}/api`;
   }
 
   async function confirmPago(payload){

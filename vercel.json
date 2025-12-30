@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://mrsmartservice-256100476140.us-central1.run.app/api/:path*"
+    }
+  ]
+}

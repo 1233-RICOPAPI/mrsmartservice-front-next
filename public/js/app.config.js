@@ -21,6 +21,8 @@
     isPrivateIp;
 
   // URL REAL de Cloud Run (SIN /api al final)
+  // Nota: la dejamos como referencia, pero en producción el front consumirá el backend
+  // vía el mismo origen ("/api"), usando un rewrite en Vercel para evitar problemas de CORS.
   const CLOUD_RUN_ORIGIN =
     "https://mrsmartservice-256100476140.us-central1.run.app";
 
@@ -35,7 +37,7 @@
 
   // Origen del backend (sin /api)
   // - En local: localhost:8080
-  // - En prod: window.__API__ (si existe) o CLOUD_RUN_ORIGIN
+  // - En prod: window.__API__ (si existe) o el mismo origen del front (location.origin)
   // En local usamos el mismo host del front para llegar al backend (8080).
   // Si el host es localhost/127.0.0.1 => usamos localhost.
   const localBackendHost =
@@ -43,7 +45,7 @@
 
   const BACKEND_ORIGIN = isLocal
     ? `http://${localBackendHost}:8080`
-    : trimSlash(window.__API__ || CLOUD_RUN_ORIGIN);
+    : trimSlash(window.__API__ || location.origin);
 
   // API base (siempre termina en /api)
   const API = join(BACKEND_ORIGIN, "/api");

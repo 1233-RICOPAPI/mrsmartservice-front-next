@@ -1624,8 +1624,11 @@ async function initDomiciliosUI() {
   if (!tbody || !btnRef || !btnSave) return;
 
   let all = [];
-  // Candado anti doble envío: evita crear/actualizar 2 veces (doble click o doble listener)
+  // Candado anti doble envío: evita crear/actualizar 2 veces (doble click / doble listener / doble init)
+  // Usamos además un candado GLOBAL para que, aunque se registre el handler más de una vez,
+  // solo una ejecución pase.
   let isSaving = false;
+  const SW_SAVING_KEY = "__MR_SW_SAVING__";
 
   function setSavingState(saving) {
     isSaving = !!saving;
@@ -1771,16 +1774,21 @@ async function initDomiciliosUI() {
   btnClear?.addEventListener('click', clearForm);
 
   btnSave.addEventListener('click', async () => {
-    if (isSaving) return; // evita doble creación por doble click o doble listener
-    const dto = readForm();
+    // Candado GLOBAL: si por alguna razón este handler se registra 2 veces,
+    // solo una ejecución pasa.
+    if (window[SW_SAVING_KEY]) return;
+    window[SW_SAVING_KEY] = true;
+    try {
+      if (isSaving) return; // evita doble creación por doble click
+      const dto = readForm();
     if (!dto.name) {
       showToast('El nombre es obligatorio', 'error');
       return;
     }
 
-    const id = (inpId?.value || '').trim();
-    try {
-      setSavingState(true);
+      const id = (inpId?.value || '').trim();
+      try {
+        setSavingState(true);
       // Si el admin seleccionó archivos, los subimos primero y los añadimos a image_url.
       const newUrls = inpFiles?.files?.length ? await uploadImages(inpFiles.files) : [];
       if (newUrls.length) {
@@ -1810,8 +1818,11 @@ async function initDomiciliosUI() {
     } catch (err) {
       console.error('Error guardando software:', err);
       showToast('No se pudo guardar el software', 'error');
+      } finally {
+        setSavingState(false);
+      }
     } finally {
-      setSavingState(false);
+      window[SW_SAVING_KEY] = false;
     }
   });
 
