@@ -1624,6 +1624,28 @@ async function initDomiciliosUI() {
   if (!tbody || !btnRef || !btnSave) return;
 
   let all = [];
+  // Candado anti doble envío: evita crear/actualizar 2 veces (doble click o doble listener)
+  let isSaving = false;
+
+  function setSavingState(saving) {
+    isSaving = !!saving;
+    try {
+      btnSave.disabled = isSaving;
+      if (btnClear) btnClear.disabled = isSaving;
+      if (btnRef) btnRef.disabled = isSaving;
+    } catch {}
+
+    // UX: cambia el texto mientras guarda
+    try {
+      if (isSaving) {
+        btnSave.dataset._prevText = btnSave.textContent || '';
+        btnSave.textContent = 'Guardando...';
+      } else if (btnSave.dataset._prevText) {
+        btnSave.textContent = btnSave.dataset._prevText;
+        delete btnSave.dataset._prevText;
+      }
+    } catch {}
+  }
 
   function readForm() {
     return {
@@ -1749,6 +1771,7 @@ async function initDomiciliosUI() {
   btnClear?.addEventListener('click', clearForm);
 
   btnSave.addEventListener('click', async () => {
+    if (isSaving) return; // evita doble creación por doble click o doble listener
     const dto = readForm();
     if (!dto.name) {
       showToast('El nombre es obligatorio', 'error');
@@ -1757,6 +1780,7 @@ async function initDomiciliosUI() {
 
     const id = (inpId?.value || '').trim();
     try {
+      setSavingState(true);
       // Si el admin seleccionó archivos, los subimos primero y los añadimos a image_url.
       const newUrls = inpFiles?.files?.length ? await uploadImages(inpFiles.files) : [];
       if (newUrls.length) {
@@ -1786,6 +1810,8 @@ async function initDomiciliosUI() {
     } catch (err) {
       console.error('Error guardando software:', err);
       showToast('No se pudo guardar el software', 'error');
+    } finally {
+      setSavingState(false);
     }
   });
 
