@@ -1539,6 +1539,261 @@ function initUsersAdminUI() {
 }
 
 
+/********************
+ * ADMIN LICENCIAS (postventa)
+ ********************/
+
+async function fetchLicensesAdmin(query = {}) {
+  const qs = new URLSearchParams();
+  if (query.software_id) qs.set('software_id', String(query.software_id));
+  if (query.q) qs.set('q', String(query.q));
+  if (query.revoked !== undefined && query.revoked !== null && query.revoked !== '') {
+    qs.set('revoked', String(query.revoked));
+  }
+  const suffix = qs.toString() ? ('?' + qs.toString()) : '';
+  return await apiFetch('/licenses' + suffix, { headers: adminAuthHeaders() });
+}
+
+function initLicensesAdminUI() {
+  const wrapper = document.getElementById('licensesAdmin');
+  if (!wrapper) return;
+
+  const roleUpper = adminCurrentUser ? String(adminCurrentUser.role).toUpperCase() : '';
+  if (!['ADMIN', 'DEV_ADMIN'].includes(roleUpper)) {
+    wrapper.style.display = 'none';
+    return;
+  }
+
+  wrapper.innerHTML = `
+    <h2>Licencias (postventa)</h2>
+    <p class="text-muted">
+      Genera licencias por <b>software</b> (para que NO funcionen en otros).\n
+      Por defecto: <b>3 sedes</b> + <b>6 PCs</b> + <b>major_max = 1 (v1)</b>.
+    </p>
+
+    <form id="formLic" class="form-grid" autocomplete="off">
+      <div class="profile-row profile-row-2">
+        <div class="form-field">
+          <label for="licSoftware">Software</label>
+          <select id="licSoftware"></select>
+        </div>
+        <div class="form-field">
+          <label for="licMajor">Versión máxima (major_max)</label>
+          <input id="licMajor" type="number" min="1" value="1" />
+        </div>
+      </div>
+
+      <div class="profile-row profile-row-2">
+        <div class="form-field">
+          <label for="licSites">Sedes (max_sites)</label>
+          <input id="licSites" type="number" min="1" value="3" />
+        </div>
+        <div class="form-field">
+          <label for="licDevices">PCs (max_devices)</label>
+          <input id="licDevices" type="number" min="1" value="6" />
+        </div>
+      </div>
+
+      <div class="profile-row profile-row-2">
+        <div class="form-field">
+          <label for="licEmail">Correo cliente (opcional)</label>
+          <input id="licEmail" type="email" placeholder="cliente@correo.com" />
+        </div>
+        <div class="form-field">
+          <label for="licName">Nombre / Empresa (opcional)</label>
+          <input id="licName" type="text" placeholder="Nombre o empresa" />
+        </div>
+      </div>
+
+      <div class="profile-actions" style="gap:10px;display:flex;flex-wrap:wrap;align-items:center">
+        <button type="submit" class="btn-primary">Generar licencia</button>
+        <button type="button" class="btn-secondary" id="btnRefreshLic">Actualizar</button>
+        <div class="text-muted" style="font-size:13px">Tip: busca por correo, nit, empresa…</div>
+      </div>
+
+      <div class="profile-row profile-row-2" style="margin-top:10px">
+        <div class="form-field">
+          <label for="licSearch">Buscar</label>
+          <input id="licSearch" type="text" placeholder="correo / empresa / nit" />
+        </div>
+        <div class="form-field">
+          <label for="licRevoked">Estado</label>
+          <select id="licRevoked">
+            <option value="">Todas</option>
+            <option value="false">Activas</option>
+            <option value="true">Revocadas</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <div class="table-wrap" style="margin-top:1.5rem;">
+      <table class="smart-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Software</th>
+            <th>Cliente</th>
+            <th>v</th>
+            <th>Sedes</th>
+            <th>PCs</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="licensesTbody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:10px">
+      <div class="text-muted" style="font-size:13px;line-height:1.4">
+        La licencia incluye <code>software_id</code>. El software offline valida que coincida con su ID\n
+        (por ejemplo Parqueadero = <b>3</b>), así NO se cruza con Restaurante, etc.
+      </div>
+    </div>
+  `;
+
+  const $soft = document.getElementById('licSoftware');
+  const $tbody = document.getElementById('licensesTbody');
+  const $form = document.getElementById('formLic');
+  const $btnRefresh = document.getElementById('btnRefreshLic');
+  const $search = document.getElementById('licSearch');
+  const $revoked = document.getElementById('licRevoked');
+  if (!$soft || !$tbody || !$form || !$btnRefresh || !$search || !$revoked) return;
+
+  async function loadSoftwares() {
+    try {
+      const list = await apiFetch('/softwares/all', { headers: adminAuthHeaders() });
+      const arr = Array.isArray(list) ? list : [];
+      $soft.innerHTML = arr.map((s) => {
+        const id = s.softwareId ?? s.software_id ?? s.id;
+        const name = s.name || ('Software #' + id);
+        const sel = String(id) === '3' ? 'selected' : '';
+        return `<option value="${id}" ${sel}>${escapeHtml(name)} (ID ${id})</option>`;
+      }).join('');
+    } catch (e) {
+      console.error('Error cargando softwares para licencias:', e);
+      $soft.innerHTML = `<option value="3">Software Parqueadero (ID 3)</option>`;
+    }
+  }
+
+  function renderRows(rows) {
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) {
+      $tbody.innerHTML = `<tr><td colspan="8">No hay licencias.</td></tr>`;
+      return;
+    }
+    $tbody.innerHTML = arr.map((r) => {
+      const id = r.license_id;
+      const sw = r.software_name || ('ID ' + r.software_id);
+      const cli = (r.customer_email || r.customer_name || r.customer_company || '').trim() || '-';
+      const st = r.revoked ? 'Revocada' : 'Activa';
+      const btnText = r.revoked ? 'Reactivar' : 'Revocar';
+      const btnClass = r.revoked ? 'btn-secondary' : 'btn-danger';
+
+      return `
+        <tr data-id="${id}" data-key="${encodeURIComponent(r.license_key || '')}" data-revoked="${r.revoked ? '1' : '0'}">
+          <td>${id}</td>
+          <td>${escapeHtml(sw)}</td>
+          <td>${escapeHtml(cli)}</td>
+          <td>${Number(r.major_max || 1)}</td>
+          <td>${Number(r.max_sites || 0)}</td>
+          <td>${Number(r.max_devices || 0)}</td>
+          <td>${st}</td>
+          <td style="white-space:nowrap">
+            <button type="button" class="btn-secondary btn-copy-lic">Copiar</button>
+            <button type="button" class="${btnClass} btn-toggle-lic">${btnText}</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function loadRows() {
+    const q = $search.value.trim();
+    const revoked = $revoked.value;
+    const software_id = $soft.value;
+    try {
+      const rows = await fetchLicensesAdmin({ software_id, q, revoked });
+      renderRows(rows);
+    } catch (e) {
+      console.error('Error cargando licencias:', e);
+      showToast('No se pudieron cargar licencias', 'error');
+      renderRows([]);
+    }
+  }
+
+  // generar
+  $form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      software_id: Number($soft.value),
+      major_max: Number(document.getElementById('licMajor')?.value || 1),
+      max_sites: Number(document.getElementById('licSites')?.value || 3),
+      max_devices: Number(document.getElementById('licDevices')?.value || 6),
+      customer_email: (document.getElementById('licEmail')?.value || '').trim(),
+      customer_name: (document.getElementById('licName')?.value || '').trim(),
+      license_type: 'PERPETUAL',
+    };
+
+    try {
+      const res = await apiFetch('/licenses', {
+        method: 'POST',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      showToast('Licencia generada ✅', 'success');
+      // Copiar al portapapeles
+      try { await navigator.clipboard.writeText(res.license_key || ''); } catch {}
+      await loadRows();
+    } catch (e) {
+      console.error('Error generando licencia:', e);
+      const msg = (e && e.message) ? e.message : 'No se pudo generar la licencia';
+      showToast(msg, 'error');
+    }
+  });
+
+  $btnRefresh.addEventListener('click', async () => {
+    await loadRows();
+    showToast('Licencias actualizadas', 'success');
+  });
+  $search.addEventListener('input', () => { loadRows(); });
+  $revoked.addEventListener('change', () => { loadRows(); });
+  $soft.addEventListener('change', () => { loadRows(); });
+
+  $tbody.addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const id = tr.dataset.id;
+    if (!id) return;
+
+    if (e.target.closest('.btn-copy-lic')) {
+      const key = decodeURIComponent(tr.dataset.key || '');
+      if (!key) return showToast('Esta licencia no tiene key', 'error');
+      try { await navigator.clipboard.writeText(key); } catch {}
+      showToast('Licencia copiada', 'success');
+      return;
+    }
+
+    if (e.target.closest('.btn-toggle-lic')) {
+      const revoked = tr.dataset.revoked === '1';
+      const endpoint = revoked ? `/licenses/${id}/unrevoke` : `/licenses/${id}/revoke`;
+      try {
+        await apiFetch(endpoint, { method: 'PATCH', headers: adminAuthHeaders() });
+        showToast(revoked ? 'Licencia reactivada' : 'Licencia revocada', 'success');
+        await loadRows();
+      } catch (err) {
+        console.error('Error cambiando estado licencia:', err);
+        showToast('No se pudo cambiar el estado', 'error');
+      }
+    }
+  });
+
+  // init
+  loadSoftwares().then(loadRows);
+}
+
+
 
 /********************
  * ADMIN SOFTWARES (reciclado de "Domicilios")
@@ -1604,6 +1859,10 @@ function escapeHtml(str) {
 }
 
 async function initDomiciliosUI() {
+      // Guard extra: evita dobles listeners (y dobles POST) si por alguna razón se inicializa dos veces
+      if (window.__MR_SW_ADMIN_INIT) return;
+      window.__MR_SW_ADMIN_INIT = true;
+
   const tbody     = document.getElementById('domTableBody');
   const btnRef    = document.getElementById('domRefresh');
   const selEstado = document.getElementById('domEstado');
@@ -1924,6 +2183,7 @@ function initAdminPanel() {
       case 'tab-perfil':
         initProfileAdminUI?.();
         initUsersAdminUI?.();
+        initLicensesAdminUI?.();
         break;
     }
 

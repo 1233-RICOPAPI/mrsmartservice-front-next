@@ -2,8 +2,28 @@
   const card = document.getElementById('sdCard');
   if (!card) return;
 
-  const wa = (window.WHATSAPP_BUSINESS || window.MR_CONFIG?.WHATSAPP_NUMBER || '573014190633').replace(/\D/g,'');
-  const DEFAULT_IMG = window.MR_CONFIG?.DEFAULT_SOFTWARE_IMG || '/assets/img/default-software.svg';
+  const wa = (window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
+  const DEFAULT_IMG = (window.MR_CONFIG && window.MR_CONFIG.DEFAULT_SOFTWARE_IMG)
+    ? window.MR_CONFIG.DEFAULT_SOFTWARE_IMG
+    : 'images/software.avif';
+
+  const API_HOST = (() => {
+    const base = (window.MR_CONFIG && window.MR_CONFIG.API_BASE) ? window.MR_CONFIG.API_BASE : (window.API || '');
+    const s = String(base || '').replace(/\/+$/, '');
+    return s.replace(/\/api$/, '');
+  })();
+
+  function resolveImgUrl(url){
+    const raw = String(url || '').trim();
+    if (!raw) return DEFAULT_IMG;
+    if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+    if (!API_HOST) {
+      if (raw.startsWith('/')) return raw;
+      return '/' + raw;
+    }
+    if (raw.startsWith('/')) return API_HOST + raw;
+    return API_HOST + '/' + raw;
+  }
 
   const fallback = {
     'parqueadero': {
@@ -39,36 +59,12 @@
     return String(tags).split(',').map(s=>s.trim()).filter(Boolean);
   }
 
-  function resolveImg(u){
-    const raw = String(u || '').trim();
-    if (!raw) return DEFAULT_IMG;
-    if (/^(https?:\/\/|data:|blob:)/i.test(raw)) return raw;
-
-    const apiBase = String(window.MR_CONFIG?.API_BASE || '').replace(/\/+$/,'');
-    const apiOrigin = apiBase.replace(/\/api$/,'');
-    const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
-
-    // /uploads/... debe venir del backend, no de Vercel
-    if (withSlash.startsWith('/uploads/')) {
-      return apiOrigin ? `${apiOrigin}${withSlash}` : withSlash;
-    }
-
-    // Si en BD guardaste sin el prefijo, asumimos carpeta uploads
-    if (!withSlash.includes('/')) {
-      return apiOrigin ? `${apiOrigin}/uploads/${raw}` : `/uploads/${raw}`;
-    }
-
-    // fallback a utilidad si existe
-    const resolved = (window.MR_UTIL?.resolveMediaUrl) ? window.MR_UTIL.resolveMediaUrl(raw) : raw;
-    return resolved || DEFAULT_IMG;
-  }
-
   function splitImages(imageUrl){
-    const raw = String(imageUrl || '').trim();
+    const raw = (imageUrl || '').trim();
     if (!raw) return [DEFAULT_IMG];
     // Permitimos varias URLs separadas por coma (se guarda en el mismo campo para no migrar BD)
-    const list = raw.split(',').map(s=>s.trim()).filter(Boolean).map(resolveImg);
-    return list.length ? list : [DEFAULT_IMG];
+    const list = raw.split(',').map(s=>s.trim()).filter(Boolean);
+    return (list.length ? list : [DEFAULT_IMG]).map(resolveImgUrl);
   }
 
   function normalize(sw){
@@ -145,7 +141,6 @@
       </div>
     `;
 
-    // thumbs behavior
     const main = document.getElementById('sdMainImg');
     const thumbs = document.getElementById('sdThumbs');
     thumbs?.addEventListener('click', (e) => {
@@ -166,7 +161,6 @@
       return;
     }
 
-    // Si no es numérico, usamos fallback local (cuando aún no hay datos en BD)
     const n = Number(id);
     if (!Number.isFinite(n)) {
       const sw = fallback[id];
@@ -176,8 +170,10 @@
     }
 
     try {
-      const sw = await (window.apiFetch ? window.apiFetch(`/softwares/${n}`) : Promise.resolve(null));
-      if (!sw) throw new Error('empty');
+      const base = (typeof apiBase === 'function' ? apiBase() : (window.API ? (String(window.API).replace(/\/+$/, '') + '/api') : ''));
+      const res = await fetch(base + `/softwares/${n}`, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('http_' + res.status);
+      const sw = await res.json();
       render(sw);
     } catch (err) {
       console.warn('No se pudo cargar el detalle del software:', err);

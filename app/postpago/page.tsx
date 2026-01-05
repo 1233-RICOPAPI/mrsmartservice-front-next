@@ -1,7 +1,15 @@
-import { redirectToStaticHtml } from '../_lib/redirectToStatic';
+'use client';
 
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-export default async function Page({ searchParams }: Props) {
-  redirectToStaticHtml('/postpago.html', await searchParams);
+export default function PostpagoRedirect() {
+  const sp = useSearchParams();
+
+  useEffect(() => {
+    const qs = sp?.toString() || '';
+    window.location.replace(`/postpago.html${qs ? `?${qs}` : ''}`);
+  }, [sp]);
+
+  return null;
 }

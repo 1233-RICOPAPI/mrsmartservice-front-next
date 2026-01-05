@@ -1,7 +1,16 @@
-import { redirectToStaticHtml } from '../_lib/redirectToStatic';
+'use client';
 
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-export default async function Page({ searchParams }: Props) {
-  redirectToStaticHtml('/login.html', await searchParams);
+export default function LoginRedirect() {
+  const sp = useSearchParams();
+
+  useEffect(() => {
+    const qs = sp?.toString() || '';
+    const target = '/login.html' + (qs ? '?' + qs : '');
+    window.location.replace(target);
+  }, [sp]);
+
+  return null;
 }

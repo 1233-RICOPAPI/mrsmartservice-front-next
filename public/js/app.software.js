@@ -2,8 +2,32 @@
   const grid = document.getElementById('swGrid');
   if (!grid) return;
 
-  const wa = (window.WHATSAPP_BUSINESS || window.MR_CONFIG?.WHATSAPP_NUMBER || '573014190633').replace(/\D/g,'');
-  const DEFAULT_IMG = window.MR_CONFIG?.DEFAULT_SOFTWARE_IMG || '/assets/img/default-software.svg';
+  const wa = (window.WHATSAPP_BUSINESS || '573014190633').replace(/\D/g,'');
+  const DEFAULT_IMG = (window.MR_CONFIG && window.MR_CONFIG.DEFAULT_SOFTWARE_IMG)
+    ? window.MR_CONFIG.DEFAULT_SOFTWARE_IMG
+    : 'images/software.avif';
+
+  // Base host para archivos (uploads). Preferimos MR_CONFIG.API_BASE y luego window.API.
+  const API_HOST = (() => {
+    const base = (window.MR_CONFIG && window.MR_CONFIG.API_BASE) ? window.MR_CONFIG.API_BASE : (window.API || '');
+    const s = String(base || '').replace(/\/+$/, '');
+    return s.endsWith('/api') ? s.slice(0, -4) : s;
+  })();
+
+  function resolveImgUrl(url){
+    const raw = String(url || '').trim();
+    if (!raw) return DEFAULT_IMG;
+    if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+
+    // Si viene como /uploads/.. o uploads/.. lo servimos desde el backend
+    if (API_HOST) {
+      if (raw.startsWith('/')) return API_HOST + raw;
+      return API_HOST + '/' + raw;
+    }
+
+    // Fallback: lo dejamos tal cual (sirve para rutas relativas en local)
+    return raw;
+  }
 
   // Fallback local (si la API aún no tiene softwares cargados)
   const fallback = [
@@ -42,35 +66,13 @@
       .filter(Boolean);
   }
 
-  function resolveImg(url){
-    const u = String(url || '').trim();
-    if (!u) return DEFAULT_IMG;
-    if (/^(https?:\/\/|data:|blob:)/i.test(u)) return u;
-
-    // Si el backend guarda rutas relativas (uploads/.. o /uploads/..),
-    // en Vercel eso apunta al front y da 404. Aquí las convertimos a URL
-    // absoluta del backend (API_BASE sin /api).
-    const apiBase = String(window.MR_CONFIG?.API_BASE || '').trim();
-    const apiOrigin = apiBase.replace(/\/api\/?$/, '');
-    const isUpload = u.startsWith('/uploads') || u.startsWith('uploads/');
-    if (isUpload && apiOrigin) {
-      const path = u.startsWith('/') ? u : `/${u}`;
-      return `${apiOrigin}${path}`;
-    }
-
-    // Fallback al resolutor si existe
-    if (window.MR_UTIL?.resolveMediaUrl) {
-      return window.MR_UTIL.resolveMediaUrl(u) || DEFAULT_IMG;
-    }
-    return u;
-  }
-
   function normalize(sw){
     const id = sw.softwareId ?? sw.software_id ?? sw.id ?? sw.slug ?? '';
     const name = sw.name || '';
     const desc = sw.shortDescription ?? sw.short_description ?? sw.desc ?? sw.description ?? '';
     const features = sw.features ?? '';
-    const img = resolveImg(sw.imageUrl ?? sw.image_url ?? sw.img);
+    const imgRaw = sw.imageUrl ?? sw.image_url ?? sw.img ?? DEFAULT_IMG;
+    const img = resolveImgUrl(imgRaw);
     const tags = splitTags(sw.tags);
     return { id, name, desc, features, img, tags };
   }
@@ -106,7 +108,6 @@
 
   async function init(){
     try {
-      // Nota: apiFetch usa /api/... por debajo, por eso aquí NO ponemos /api
       const data = await (window.apiFetch ? window.apiFetch('/softwares') : Promise.resolve(null));
       const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
       render(list.length ? list : fallback);

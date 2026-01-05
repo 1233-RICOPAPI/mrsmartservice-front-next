@@ -2,6 +2,9 @@
  * MR SmartService - Auth (login, recuperar, reset, cambio de contraseña)
  ********************/
 
+// API base (en producción apunta a Cloud Run)
+const BASE = (typeof apiBase === 'function' ? apiBase() : (window.API || ''));
+
 /* ============== LOGIN ============== */
 async function doLogin(email, password) {
   const msg = document.getElementById('mensaje');
@@ -12,7 +15,7 @@ async function doLogin(email, password) {
 
   try {
     // 1) Login contra la API
-    const res = await fetch(API + '/login', {
+    const res = await fetch(BASE + '/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -29,7 +32,7 @@ async function doLogin(email, password) {
     // 3) Preguntar a /api/me qué rol tiene este token
     let goAdmin = false;
     try {
-      const meRes = await fetch(API + '/me', {
+      const meRes = await fetch(BASE + '/me', {
         headers: authHeaders()    // usa el token recién guardado
       });
 
@@ -184,7 +187,7 @@ function initChangePasswordForm() {
     }
 
     try {
-      const res = await fetch(API + '/users/change-password', {
+      const res = await fetch(BASE + '/users/change-password', {
         method: 'POST',
         headers: {
           ...authHeaders(),
@@ -241,13 +244,20 @@ function initForgotPasswordUI() {
     }
 
     try {
-      const res = await fetch(API + '/auth/request-reset', {
+      const res = await fetch(BASE + '/auth/request-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
 
       const data = await res.json().catch(() => ({}));
+
+      // Caso especial: el backend no tiene SMTP configurado (no puede enviar emails)
+      if (data && data.ok === false && (data.error === 'smtp_not_configured' || data.code === 'smtp_not_configured')) {
+        setMsg('⚠️ El servidor no tiene SMTP configurado. Configura SMTP en Cloud Run para que lleguen los correos.', false);
+        if (data.resetUrl) console.log('🔗 Enlace de recuperación (debug):', data.resetUrl);
+        return;
+      }
 
       if (!res.ok) {
         const code = data.error || data.code || 'request_failed';
@@ -327,7 +337,7 @@ function initResetPasswordUI() {
     try {
       if (btn) btn.disabled = true;
 
-      const res = await fetch(API + '/auth/reset-password', {
+      const res = await fetch(BASE + '/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password: pass1 })
