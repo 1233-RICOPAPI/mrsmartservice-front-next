@@ -243,12 +243,18 @@ async function initStatsUI() {
       kpiTicket.textContent   = '$' + money(data.ticket || 0);
       kpiRate.textContent     = (data.rate || 0) + '%';
 
-      if (Array.isArray(data.series) && data.series.length) {
-        bars.innerHTML = data.series
+      // Compat: el backend puede retornar series como array [{label,value}] o como {labels:[], values:[]}
+      let series = data.series;
+      if (!Array.isArray(series) && series && Array.isArray(series.labels) && Array.isArray(series.values)) {
+        series = series.labels.map((l, i) => ({ label: String(l), value: Number(series.values[i] || 0) }));
+      }
+
+      if (Array.isArray(series) && series.length) {
+        bars.innerHTML = series
           .map((p) => {
             const value = Number(p.value || 0);
             // % relativo para el ancho de la barrita
-            const max   = Math.max(...data.series.map(s => Number(s.value || 0) || 0), 1);
+            const max   = Math.max(...series.map(s => Number(s.value || 0) || 0), 1);
             const pct   = Math.round((value / max) * 100);
 
             return `
@@ -299,7 +305,7 @@ async function initVentasUI() {
     const query   = document.getElementById('ventaQuery')?.value.trim() || '';
 
     const params = new URLSearchParams();
-    if (estado && estado !== 'todos') params.set('status', estado);
+    if (estado && estado !== 'todos') params.set('status', String(estado).toUpperCase());
     if (query) params.set('q', query);
     if (desde) params.set('from', desde);
     if (hasta) params.set('to', hasta);
@@ -334,7 +340,7 @@ async function initVentasUI() {
                 <td>${total}</td>
                 <td>${o.status}</td>
                 <td class="right">
-                  <!-- aquí podrías poner botón "Ver detalle" si quieres -->
+                  <button type="button" class="btn btn-light btn-cred" data-order='${encodeURIComponent(JSON.stringify(o))}'>Credenciales</button>
                 </td>
               </tr>
             `;
@@ -370,6 +376,175 @@ async function initVentasUI() {
 
   // primera carga
   cargarVentas(1);
+
+  // acciones (delegación)
+  tbody.addEventListener('click', async (ev) => {
+    const btn = ev.target?.closest?.('.btn-cred');
+    if (!btn) return;
+    ev.preventDefault();
+    const raw = btn.getAttribute('data-order') || '';
+    let order;
+    try { order = JSON.parse(decodeURIComponent(raw)); } catch { order = null; }
+    if (!order) return;
+    await openCredModal(order);
+  });
+}
+
+// =========================
+// MODAL: Credenciales por venta
+// =========================
+let __cachedSoftwaresForCred = null;
+
+async function fetchSoftwaresForCred() {
+  if (__cachedSoftwaresForCred) return __cachedSoftwaresForCred;
+  try {
+    const data = await apiFetch('/softwares', { headers: adminAuthHeaders() });
+    const rows = Array.isArray(data) ? data : (data.rows || data.data || []);
+    __cachedSoftwaresForCred = rows.map((s) => ({
+      id: s.software_id ?? s.id ?? s.softwareId,
+      name: s.nombre ?? s.name ?? `Software #${s.software_id ?? s.id ?? ''}`,
+    })).filter((s) => s.id);
+  } catch (e) {
+    console.error('No se pudieron cargar softwares para credenciales:', e);
+    __cachedSoftwaresForCred = [];
+  }
+  return __cachedSoftwaresForCred;
+}
+
+function showCredModal(show) {
+  const el = document.getElementById('credModal');
+  if (!el) return;
+  el.classList.toggle('hidden', !show);
+}
+
+async function openCredModal(order) {
+  const info = document.getElementById('credSaleInfo');
+  const sel = document.getElementById('credSoftware');
+  const inUser = document.getElementById('credUser');
+  const inPass = document.getElementById('credPass');
+  const btnGen = document.getElementById('btnGenCred');
+  const btnCopy = document.getElementById('btnCopyCredMsg');
+  const aWaSend = document.getElementById('btnSendCredWa');
+  const aWaBuyer = document.getElementById('btnOpenWaBuyer');
+  const btnClose = document.getElementById('btnCloseCred');
+  const resBox = document.getElementById('credResult');
+  const outUser = document.getElementById('credOutUser');
+  const outPass = document.getElementById('credOutPass');
+
+  if (!sel || !btnGen || !btnClose) return;
+
+  // reset UI
+  if (info) {
+    const who = order.domicilio_nombre || order.email || 'Cliente';
+    info.textContent = `Orden: ${order.order_id} • ${who} • Total: ${money(order.total_amount || 0)}`;
+  }
+  if (inUser) inUser.value = '';
+  if (inPass) inPass.value = '';
+  if (resBox) resBox.style.display = 'none';
+  if (btnCopy) btnCopy.disabled = true;
+  if (aWaSend) {
+    aWaSend.style.pointerEvents = 'none';
+    aWaSend.style.opacity = '.55';
+    aWaSend.setAttribute('href', '#');
+  }
+  if (aWaBuyer) {
+    aWaBuyer.style.pointerEvents = 'none';
+    aWaBuyer.style.opacity = '.55';
+    aWaBuyer.setAttribute('href', '#');
+  }
+
+  // load softwares
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  const softwares = await fetchSoftwaresForCred();
+  sel.innerHTML = '<option value="">Selecciona un software</option>' + softwares.map((s) => `
+      <option value="${s.id}">${escapeHtml(String(s.name))} (ID ${s.id})</option>
+    `).join('');
+
+  // buyer whatsapp
+  const phone = String(order.domicilio_telefono || order.phone || order.telefono || '').replace(/\D/g, '');
+  if (phone && aWaBuyer) {
+    aWaBuyer.href = `https://wa.me/57${phone}`;
+    aWaBuyer.style.pointerEvents = 'auto';
+    aWaBuyer.style.opacity = '1';
+  }
+
+  const close = () => showCredModal(false);
+  btnClose.onclick = close;
+  // click outside dialog to close
+  document.querySelector('#credModal .modal-envio-backdrop')?.addEventListener('click', close, { once: true });
+
+  let last = null;
+
+  const buildCredMessage = (ctx) => {
+    const who = ctx.order.domicilio_nombre || ctx.order.email || 'Cliente';
+    const pickup = (String(ctx.order.tipo_entrega || ctx.order.entrega || '').toLowerCase().includes('recog') || !ctx.order.domicilio_direccion)
+      ? 'Recoger en el local'
+      : `Domicilio: ${ctx.order.domicilio_direccion || ''}`;
+    return `Hola ${who}!\n\nAquí están tus credenciales para el software (ID ${ctx.softwareId}):\n\nUsuario: ${ctx.username}\nClave: ${ctx.password}\n\nEntrega: ${pickup}\nOrden: ${ctx.order.order_id}\n\n*Guarda estas credenciales. Si deseas cambiar tu clave, avísanos.*`;
+  };
+
+  btnGen.onclick = async () => {
+    const softwareId = Number(sel.value || 0);
+    if (!softwareId) {
+      showToast('Selecciona un software', 'error');
+      return;
+    }
+    const payload = {
+      software_id: softwareId,
+      username: (inUser?.value || '').trim(),
+      password: (inPass?.value || '').trim(),
+      order_id: order.order_id,
+    };
+    try {
+      btnGen.disabled = true;
+      const created = await apiFetch('/software-credentials', {
+        method: 'POST',
+        headers: { ...adminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      last = { ...created, order, softwareId };
+      if (outUser) outUser.textContent = created.username;
+      if (outPass) outPass.textContent = created.password;
+      if (resBox) resBox.style.display = 'block';
+      if (btnCopy) btnCopy.disabled = false;
+
+      // enable "Enviar credenciales por WhatsApp"
+      const p = String(order.domicilio_telefono || order.phone || order.telefono || '').replace(/\D/g, '');
+      if (aWaSend) {
+        if (!p) {
+          aWaSend.style.pointerEvents = 'none';
+          aWaSend.style.opacity = '.55';
+          aWaSend.setAttribute('href', '#');
+        } else {
+          const msg = buildCredMessage(last);
+          aWaSend.href = `https://wa.me/57${p}?text=${encodeURIComponent(msg)}`;
+          aWaSend.style.pointerEvents = 'auto';
+          aWaSend.style.opacity = '1';
+        }
+      }
+      showToast('Credenciales generadas', 'success');
+    } catch (e) {
+      console.error('Error creando credenciales:', e);
+      const msg = e?.message || (e?.error ? JSON.stringify(e.error) : 'Error creando credenciales');
+      showToast('No se pudo generar: ' + msg, 'error');
+    } finally {
+      btnGen.disabled = false;
+    }
+  };
+
+  btnCopy && (btnCopy.onclick = async () => {
+    if (!last) return;
+    const text = buildCredMessage(last);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Mensaje copiado', 'success');
+    } catch {
+      // fallback
+      prompt('Copia el mensaje:', text);
+    }
+  });
+
+  showCredModal(true);
 }
 
 
@@ -1355,43 +1530,49 @@ function bindEditProductModal() {
 
 
 
-/************ ADMIN USUARIOS (MÁX 3 EXTRAS, SOLO ADMIN/DEV) ************/
-async function fetchUsersAdmin() {
+/**
+ * PERFIL (ADMIN): Credenciales por software
+ * - Reemplaza el bloque "Usuarios del panel".
+ * - El admin genera usuario/clave únicos POR SOFTWARE.
+ */
+async function fetchSoftwaresForCreds() {
   try {
-    const data = await apiFetch('/users', {
-      headers: adminAuthHeaders()
-    });
-    return data;
+    return await apiFetch('/softwares/all', { headers: adminAuthHeaders() });
   } catch (err) {
-    console.error('Error cargando usuarios admin:', err);
+    console.error('Error cargando softwares:', err);
     return [];
   }
 }
 
-function renderUsersAdmin(users) {
-  const tbody = document.getElementById('adminUsersTbody');
+async function fetchCreds(softwareId) {
+  try {
+    const qs = softwareId ? `?software_id=${encodeURIComponent(String(softwareId))}` : '';
+    return await apiFetch('/software-credentials' + qs, { headers: adminAuthHeaders() });
+  } catch (err) {
+    console.error('Error cargando credenciales:', err);
+    return [];
+  }
+}
+
+function renderCreds(rows) {
+  const tbody = document.getElementById('credsTbody');
   if (!tbody) return;
 
-  if (!Array.isArray(users) || !users.length) {
-    tbody.innerHTML = `
-      <tr><td colspan="5">No hay usuarios registrados.</td></tr>
-    `;
+  if (!Array.isArray(rows) || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="4">No hay credenciales generadas.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = users
-    .map((u) => {
-      const created = u.created_at
-        ? new Date(u.created_at).toLocaleString('es-CO')
-        : '';
+  tbody.innerHTML = rows
+    .map((c) => {
+      const created = c.created_at ? new Date(c.created_at).toLocaleString('es-CO') : '';
       return `
-        <tr data-id="${u.user_id}">
-          <td>${u.user_id}</td>
-          <td>${u.email}</td>
-          <td>${u.role}</td>
+        <tr data-id="${c.credential_id}">
+          <td>${c.credential_id}</td>
+          <td>${c.username}</td>
           <td>${created}</td>
-          <td>
-            <button class="btn btn-sm btn-danger btn-del-user">Eliminar</button>
+          <td class="right">
+            <button class="btn btn-sm btn-danger btn-del-cred">Eliminar</button>
           </td>
         </tr>
       `;
@@ -1413,28 +1594,31 @@ function initUsersAdminUI() {
     return;
   }
 
-  // Pintamos el contenido interno (form + tabla)
   wrapper.innerHTML = `
-    <h2>Usuarios del panel</h2>
+    <h2>Generar usuario y clave (por software)</h2>
     <p class="text-muted">
-      Crea hasta 3 usuarios adicionales con rol USER para el panel.
-    </p>
+      Genera credenciales (usuario y clave) <b>únicas por software</b>. Luego puedes copiarlas o enviarlas por WhatsApp al cliente.</p>
 
-    <form id="formAdminUsers" class="form-grid" autocomplete="off">
+    <form id="formCreds" class="form-grid" autocomplete="off">
       <div class="profile-row profile-row-2">
         <div class="form-field">
-          <label for="adminUserEmail">Correo del usuario</label>
-          <input type="email" id="adminUserEmail" required />
+          <label for="credSoftware">Software</label>
+          <select id="credSoftware" required></select>
         </div>
         <div class="form-field">
-          <label for="adminUserPassword">Contraseña</label>
-          <input type="password" id="adminUserPassword" required />
+          <label for="credUsername">Usuario (opcional)</label>
+          <input id="credUsername" type="text" placeholder="Si lo dejas vacío, se genera automático" />
         </div>
       </div>
-      <div class="profile-actions">
-        <button type="submit" class="btn-primary">
-          Crear usuario
-        </button>
+      <div class="profile-row profile-row-2">
+        <div class="form-field">
+          <label for="credPassword">Clave (opcional)</label>
+          <input id="credPassword" type="text" placeholder="Si lo dejas vacío, se genera automático" />
+        </div>
+        <div class="form-field">
+          <label>&nbsp;</label>
+          <button type="submit" class="btn-primary" style="width:100%">Generar credencial</button>
+        </div>
       </div>
     </form>
 
@@ -1443,99 +1627,106 @@ function initUsersAdminUI() {
         <thead>
           <tr>
             <th>ID</th>
-            <th>Correo</th>
-            <th>Rol</th>
+            <th>Usuario</th>
             <th>Creado</th>
-            <th>Acciones</th>
+            <th class="right">Acciones</th>
           </tr>
         </thead>
-        <tbody id="adminUsersTbody"></tbody>
+        <tbody id="credsTbody"></tbody>
       </table>
     </div>
   `;
 
-  const tbody = document.getElementById('adminUsersTbody');
-  const form  = document.getElementById('formAdminUsers');
-  if (!tbody || !form) return;
+  const form = document.getElementById('formCreds');
+  const sel = document.getElementById('credSoftware');
+  const tbody = document.getElementById('credsTbody');
+  if (!form || !sel || !tbody) return;
 
-  async function loadUsers() {
-    const users = await fetchUsersAdmin();
-    renderUsersAdmin(users);
+  let softwaresCache = [];
+
+  async function loadSoftwares() {
+    const rows = await fetchSoftwaresForCreds();
+    softwaresCache = Array.isArray(rows) ? rows : [];
+    sel.innerHTML = softwaresCache
+      .filter(s => s && s.software_id)
+      .map(s => `<option value="${s.software_id}">${s.name} (#${s.software_id})</option>`)
+      .join('') || '<option value="">(No hay softwares)</option>';
   }
 
-  // Crear usuario
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = form.querySelector('#adminUserEmail')?.value.trim() || '';
-    const pass  = form.querySelector('#adminUserPassword')?.value.trim() || '';
-
-    if (!email || !pass) {
-      showToast('Email y contraseña son obligatorios', 'error');
+  async function loadCreds() {
+    const sid = Number(sel.value || 0);
+    if (!sid) {
+      renderCreds([]);
       return;
     }
-    if (pass.length < 8) {
-      showToast('La contraseña debe tener al menos 8 caracteres', 'error');
+    const rows = await fetchCreds(sid);
+    renderCreds(rows);
+  }
+
+  sel.addEventListener('change', () => {
+    loadCreds();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const sid = Number(sel.value || 0);
+    const username = document.getElementById('credUsername')?.value.trim() || '';
+    const password = document.getElementById('credPassword')?.value.trim() || '';
+    if (!sid) {
+      showToast('Selecciona un software', 'error');
       return;
     }
 
     try {
-      const res = await fetch(API + '/users', {
+      const out = await apiFetch('/software-credentials', {
         method: 'POST',
         headers: adminAuthHeaders(),
-        body: JSON.stringify({ email, password: pass }),
+        body: JSON.stringify({ software_id: sid, username, password }),
       });
 
-           if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.error === 'email_in_use') {
-          showToast('Ese correo ya está en uso', 'error');
-        } else if (data.error === 'user_limit_reached') {
-          showToast('Ya tienes el máximo de 3 usuarios con rol USER.', 'error');
-        } else {
-          showToast('No se pudo crear el usuario', 'error');
-        }
-        return;
-      }
-
-
-      showToast('Usuario creado correctamente', 'success');
+      // Mostramos la clave en claro SOLO aquí (backend no la guarda en claro).
+      const msg = `Credencial generada ✅\n\nSoftware #${sid}\nUsuario: ${out.username}\nClave: ${out.password}\n\nCópialo y envíalo al cliente.`;
+      alert(msg);
+      showToast('Credencial generada', 'success');
       form.reset();
-      await loadUsers();
+      await loadCreds();
     } catch (err) {
-      console.error('Error creando usuario admin:', err);
-      showToast('Error de conexión al crear usuario', 'error');
+      console.error('Error generando credencial:', err);
+      if (String(err?.message || '').includes('username_in_use')) {
+        showToast('Ese usuario ya existe para este software', 'error');
+      } else {
+        showToast('No se pudo generar la credencial', 'error');
+      }
     }
   });
 
-  // Eliminar usuario (excepto seed se valida en el backend)
   tbody.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.btn-del-user');
+    const btn = e.target.closest('.btn-del-cred');
     if (!btn) return;
     const tr = btn.closest('tr');
     const id = tr?.dataset.id;
     if (!id) return;
 
     showConfirm({
-      title: 'Eliminar usuario',
-      message: '¿Seguro que quieres eliminar este usuario del panel?',
+      title: 'Eliminar credencial',
+      message: '¿Seguro que quieres eliminar esta credencial? El cliente ya no podrá usarla.',
       onConfirm: async () => {
         try {
-          await apiFetch(`/users/${id}`, {
-            method: 'DELETE',
-            headers: adminAuthHeaders()
-          });
-          showToast('Usuario eliminado', 'success');
-          await loadUsers();
+          await apiFetch(`/software-credentials/${id}`, { method: 'DELETE', headers: adminAuthHeaders() });
+          showToast('Credencial eliminada', 'success');
+          await loadCreds();
         } catch (err) {
-          console.error('Error eliminando usuario:', err);
-          showToast('No se pudo eliminar el usuario', 'error');
+          console.error('Error eliminando credencial:', err);
+          showToast('No se pudo eliminar la credencial', 'error');
         }
       },
     });
   });
 
-  // Cargar lista inicial
-  loadUsers();
+  (async () => {
+    await loadSoftwares();
+    await loadCreds();
+  })();
 }
 
 
@@ -1554,244 +1745,6 @@ async function fetchLicensesAdmin(query = {}) {
   return await apiFetch('/licenses' + suffix, { headers: adminAuthHeaders() });
 }
 
-function initLicensesAdminUI() {
-  const wrapper = document.getElementById('licensesAdmin');
-  if (!wrapper) return;
-
-  const roleUpper = adminCurrentUser ? String(adminCurrentUser.role).toUpperCase() : '';
-  if (!['ADMIN', 'DEV_ADMIN'].includes(roleUpper)) {
-    wrapper.style.display = 'none';
-    return;
-  }
-
-  wrapper.innerHTML = `
-    <h2>Licencias (postventa)</h2>
-    <p class="text-muted">
-      Genera licencias por <b>software</b> (para que NO funcionen en otros).\n
-      Por defecto: <b>3 sedes</b> + <b>6 PCs</b> + <b>major_max = 1 (v1)</b>.
-    </p>
-
-    <form id="formLic" class="form-grid" autocomplete="off">
-      <div class="profile-row profile-row-2">
-        <div class="form-field">
-          <label for="licSoftware">Software</label>
-          <select id="licSoftware"></select>
-        </div>
-        <div class="form-field">
-          <label for="licMajor">Versión máxima (major_max)</label>
-          <input id="licMajor" type="number" min="1" value="1" />
-        </div>
-      </div>
-
-      <div class="profile-row profile-row-2">
-        <div class="form-field">
-          <label for="licSites">Sedes (max_sites)</label>
-          <input id="licSites" type="number" min="1" value="3" />
-        </div>
-        <div class="form-field">
-          <label for="licDevices">PCs (max_devices)</label>
-          <input id="licDevices" type="number" min="1" value="6" />
-        </div>
-      </div>
-
-      <div class="profile-row profile-row-2">
-        <div class="form-field">
-          <label for="licEmail">Correo cliente (opcional)</label>
-          <input id="licEmail" type="email" placeholder="cliente@correo.com" />
-        </div>
-        <div class="form-field">
-          <label for="licName">Nombre / Empresa (opcional)</label>
-          <input id="licName" type="text" placeholder="Nombre o empresa" />
-        </div>
-      </div>
-
-      <div class="profile-actions" style="gap:10px;display:flex;flex-wrap:wrap;align-items:center">
-        <button type="submit" class="btn-primary">Generar licencia</button>
-        <button type="button" class="btn-secondary" id="btnRefreshLic">Actualizar</button>
-        <div class="text-muted" style="font-size:13px">Tip: busca por correo, nit, empresa…</div>
-      </div>
-
-      <div class="profile-row profile-row-2" style="margin-top:10px">
-        <div class="form-field">
-          <label for="licSearch">Buscar</label>
-          <input id="licSearch" type="text" placeholder="correo / empresa / nit" />
-        </div>
-        <div class="form-field">
-          <label for="licRevoked">Estado</label>
-          <select id="licRevoked">
-            <option value="">Todas</option>
-            <option value="false">Activas</option>
-            <option value="true">Revocadas</option>
-          </select>
-        </div>
-      </div>
-    </form>
-
-    <div class="table-wrap" style="margin-top:1.5rem;">
-      <table class="smart-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Software</th>
-            <th>Cliente</th>
-            <th>v</th>
-            <th>Sedes</th>
-            <th>PCs</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="licensesTbody"></tbody>
-      </table>
-    </div>
-
-    <div style="margin-top:10px">
-      <div class="text-muted" style="font-size:13px;line-height:1.4">
-        La licencia incluye <code>software_id</code>. El software offline valida que coincida con su ID\n
-        (por ejemplo Parqueadero = <b>3</b>), así NO se cruza con Restaurante, etc.
-      </div>
-    </div>
-  `;
-
-  const $soft = document.getElementById('licSoftware');
-  const $tbody = document.getElementById('licensesTbody');
-  const $form = document.getElementById('formLic');
-  const $btnRefresh = document.getElementById('btnRefreshLic');
-  const $search = document.getElementById('licSearch');
-  const $revoked = document.getElementById('licRevoked');
-  if (!$soft || !$tbody || !$form || !$btnRefresh || !$search || !$revoked) return;
-
-  async function loadSoftwares() {
-    try {
-      const list = await apiFetch('/softwares/all', { headers: adminAuthHeaders() });
-      const arr = Array.isArray(list) ? list : [];
-      $soft.innerHTML = arr.map((s) => {
-        const id = s.softwareId ?? s.software_id ?? s.id;
-        const name = s.name || ('Software #' + id);
-        const sel = String(id) === '3' ? 'selected' : '';
-        return `<option value="${id}" ${sel}>${escapeHtml(name)} (ID ${id})</option>`;
-      }).join('');
-    } catch (e) {
-      console.error('Error cargando softwares para licencias:', e);
-      $soft.innerHTML = `<option value="3">Software Parqueadero (ID 3)</option>`;
-    }
-  }
-
-  function renderRows(rows) {
-    const arr = Array.isArray(rows) ? rows : [];
-    if (!arr.length) {
-      $tbody.innerHTML = `<tr><td colspan="8">No hay licencias.</td></tr>`;
-      return;
-    }
-    $tbody.innerHTML = arr.map((r) => {
-      const id = r.license_id;
-      const sw = r.software_name || ('ID ' + r.software_id);
-      const cli = (r.customer_email || r.customer_name || r.customer_company || '').trim() || '-';
-      const st = r.revoked ? 'Revocada' : 'Activa';
-      const btnText = r.revoked ? 'Reactivar' : 'Revocar';
-      const btnClass = r.revoked ? 'btn-secondary' : 'btn-danger';
-
-      return `
-        <tr data-id="${id}" data-key="${encodeURIComponent(r.license_key || '')}" data-revoked="${r.revoked ? '1' : '0'}">
-          <td>${id}</td>
-          <td>${escapeHtml(sw)}</td>
-          <td>${escapeHtml(cli)}</td>
-          <td>${Number(r.major_max || 1)}</td>
-          <td>${Number(r.max_sites || 0)}</td>
-          <td>${Number(r.max_devices || 0)}</td>
-          <td>${st}</td>
-          <td style="white-space:nowrap">
-            <button type="button" class="btn-secondary btn-copy-lic">Copiar</button>
-            <button type="button" class="${btnClass} btn-toggle-lic">${btnText}</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  async function loadRows() {
-    const q = $search.value.trim();
-    const revoked = $revoked.value;
-    const software_id = $soft.value;
-    try {
-      const rows = await fetchLicensesAdmin({ software_id, q, revoked });
-      renderRows(rows);
-    } catch (e) {
-      console.error('Error cargando licencias:', e);
-      showToast('No se pudieron cargar licencias', 'error');
-      renderRows([]);
-    }
-  }
-
-  // generar
-  $form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const payload = {
-      software_id: Number($soft.value),
-      major_max: Number(document.getElementById('licMajor')?.value || 1),
-      max_sites: Number(document.getElementById('licSites')?.value || 3),
-      max_devices: Number(document.getElementById('licDevices')?.value || 6),
-      customer_email: (document.getElementById('licEmail')?.value || '').trim(),
-      customer_name: (document.getElementById('licName')?.value || '').trim(),
-      license_type: 'PERPETUAL',
-    };
-
-    try {
-      const res = await apiFetch('/licenses', {
-        method: 'POST',
-        headers: adminAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-      showToast('Licencia generada ✅', 'success');
-      // Copiar al portapapeles
-      try { await navigator.clipboard.writeText(res.license_key || ''); } catch {}
-      await loadRows();
-    } catch (e) {
-      console.error('Error generando licencia:', e);
-      const msg = (e && e.message) ? e.message : 'No se pudo generar la licencia';
-      showToast(msg, 'error');
-    }
-  });
-
-  $btnRefresh.addEventListener('click', async () => {
-    await loadRows();
-    showToast('Licencias actualizadas', 'success');
-  });
-  $search.addEventListener('input', () => { loadRows(); });
-  $revoked.addEventListener('change', () => { loadRows(); });
-  $soft.addEventListener('change', () => { loadRows(); });
-
-  $tbody.addEventListener('click', async (e) => {
-    const tr = e.target.closest('tr');
-    if (!tr) return;
-    const id = tr.dataset.id;
-    if (!id) return;
-
-    if (e.target.closest('.btn-copy-lic')) {
-      const key = decodeURIComponent(tr.dataset.key || '');
-      if (!key) return showToast('Esta licencia no tiene key', 'error');
-      try { await navigator.clipboard.writeText(key); } catch {}
-      showToast('Licencia copiada', 'success');
-      return;
-    }
-
-    if (e.target.closest('.btn-toggle-lic')) {
-      const revoked = tr.dataset.revoked === '1';
-      const endpoint = revoked ? `/licenses/${id}/unrevoke` : `/licenses/${id}/revoke`;
-      try {
-        await apiFetch(endpoint, { method: 'PATCH', headers: adminAuthHeaders() });
-        showToast(revoked ? 'Licencia reactivada' : 'Licencia revocada', 'success');
-        await loadRows();
-      } catch (err) {
-        console.error('Error cambiando estado licencia:', err);
-        showToast('No se pudo cambiar el estado', 'error');
-      }
-    }
-  });
-
-  // init
-  loadSoftwares().then(loadRows);
-}
 
 
 
@@ -2183,8 +2136,7 @@ function initAdminPanel() {
       case 'tab-perfil':
         initProfileAdminUI?.();
         initUsersAdminUI?.();
-        initLicensesAdminUI?.();
-        break;
+break;
     }
 
     // pequeño scroll para que siempre se vea el contenido

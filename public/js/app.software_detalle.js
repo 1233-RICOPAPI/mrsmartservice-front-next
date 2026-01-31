@@ -60,10 +60,38 @@
   }
 
   function splitImages(imageUrl){
-    const raw = (imageUrl || '').trim();
-    if (!raw) return [DEFAULT_IMG];
-    // Permitimos varias URLs separadas por coma (se guarda en el mismo campo para no migrar BD)
-    const list = raw.split(',').map(s=>s.trim()).filter(Boolean);
+    const txt = String(imageUrl || '').trim();
+    if (!txt) return [DEFAULT_IMG];
+
+    // JSON (array de objetos o strings)
+    if ((txt.startsWith('[') && txt.endsWith(']')) || (txt.startsWith('{') && txt.endsWith('}'))) {
+      try {
+        const j = JSON.parse(txt);
+        const arr = Array.isArray(j) ? j : (Array.isArray(j?.media) ? j.media : []);
+        if (Array.isArray(arr) && arr.length) {
+          const urls = [];
+          arr.forEach(x => {
+            if (!x) return;
+            if (typeof x === 'string') {
+              if (x.trim()) urls.push(x.trim());
+              return;
+            }
+            if (typeof x === 'object') {
+              const t = String(x.type || x.kind || '').toLowerCase();
+              const u = String(x.url || x.src || '').trim();
+              if (!u) return;
+              // preferimos imágenes, pero si no hay, igual mostramos lo que exista
+              if (!t || t.includes('image')) urls.push(u);
+            }
+          });
+
+          if (urls.length) return urls.map(resolveImgUrl);
+        }
+      } catch {}
+    }
+
+    // String multi-url: coma, pipe, punto y coma o salto de línea
+    const list = txt.split(/[\n\r,;|]+/g).map(s=>s.trim()).filter(Boolean);
     return (list.length ? list : [DEFAULT_IMG]).map(resolveImgUrl);
   }
 

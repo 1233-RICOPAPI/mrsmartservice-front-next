@@ -26,7 +26,28 @@ Mi nombre es: ${buyerName || ''} – Tel: ${buyerPhone || ''}` : '';
   }
 
   function card(s) {
-    const img = (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(s.image_url) : (s.image_url || ''))
+    // Compat media:
+    // - JSON: image_url = '[{"type":"image","url":"..."}, ...]'
+    // - Legacy: 'url1, url2' o 'url1|url2'
+    const pickFirstImage = (raw) => {
+      const val = (raw ?? '').toString().trim();
+      if (!val) return '';
+      // JSON list
+      if ((val.startsWith('[') && val.endsWith(']')) || (val.startsWith('{') && val.endsWith('}'))) {
+        try {
+          const parsed = JSON.parse(val);
+          const arr = Array.isArray(parsed) ? parsed : [parsed];
+          const img = arr.find(x => x && (x.type === 'image' || !x.type) && x.url) || arr.find(x => x && x.url);
+          if (img && img.url) return String(img.url);
+        } catch { /* ignore */ }
+      }
+      // legacy split
+      const parts = val.split(/[|,;\n]+/).map(x => x.trim()).filter(Boolean);
+      return parts[0] || '';
+    };
+
+    const imgRaw = pickFirstImage(s.imageUrl ?? s.image_url ?? s.img ?? '');
+    const img = (window.MR_UTIL?.resolveMediaUrl ? window.MR_UTIL.resolveMediaUrl(imgRaw) : imgRaw)
       || window.MR_CONFIG.DEFAULT_SOFTWARE_IMG;
     const tags = (s.tags || '').split(',').map(x=>x.trim()).filter(Boolean);
     return `

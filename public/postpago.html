@@ -40,11 +40,34 @@
     </div>
 
     <div class="card" id="result" style="display:none">
-      <h3 style="margin:0 0 8px">Listo</h3>
+      <h2 style="margin:0 0 6px; font-size:26px">✅ ÚLTIMO PASO</h2>
       <div class="muted" id="meta"></div>
 
-      <div style="margin-top:14px">
-        <div class="muted" style="margin-bottom:8px">Datos para facturación (se enviarán por WhatsApp)</div>
+      <div style="margin-top:12px; padding:14px; border:2px solid #22c55e; border-radius:14px; background:#ecfdf5">
+        <div style="font-weight:900; font-size:22px; line-height:1.2">
+          POR FAVOR DALE A <span style="color:#16a34a">"ENVIAR A WHATSAPP"</span>
+          PARA QUE TU PEDIDO SEA REGISTRADO.
+        </div>
+        <div class="muted" style="margin-top:8px">
+          Si no envías el WhatsApp, el administrador no verá tu compra y no podrá alistar tu pedido (domicilio o recoger en el local).
+        </div>
+      </div>
+
+      <div class="btns" style="margin-top:14px">
+        <a class="btn" id="btnWhats" href="#" target="_blank" rel="noopener"
+           style="background:#16a34a;color:#fff;font-size:18px;padding:16px 18px;border-radius:14px;flex:1">
+          📲 ENVIAR A WHATSAPP (REGISTRAR PEDIDO)
+        </a>
+        <button class="btn" id="btnNeedInvoice" type="button"
+           style="background:#111827;color:#fff;font-size:18px;padding:16px 18px;border-radius:14px;flex:1">
+          🧾 PEDIR FACTURA ELC
+        </button>
+      </div>
+
+      <div id="billingBox" style="display:none; margin-top:14px">
+        <div class="muted" style="margin-bottom:8px">
+          Datos para facturación (obligatorio para pedir Factura ELC)
+        </div>
         <div class="form-grid">
           <div class="field">
             <label for="billName">Nombre</label>
@@ -63,15 +86,25 @@
             <input id="billTel" type="tel" placeholder="Ej: 3001234567" />
           </div>
         </div>
+        <div class="btns" style="margin-top:12px">
+          <a class="btn" id="btnWhatsInvoice" href="#" target="_blank" rel="noopener"
+             style="background:#16a34a;color:#fff;font-size:18px;padding:16px 18px;border-radius:14px;flex:1">
+            📲 ENVIAR A WHATSAPP Y PEDIR FACTURA
+          </a>
+          <button class="btn btn-ghost" id="btnCancelInvoice" type="button">Cancelar</button>
+        </div>
       </div>
 
-      <div class="btns">
-        <a class="btn btn-primary" id="btnInvoice" href="#" target="_blank" rel="noopener">Descargar factura</a>
-        <a class="btn btn-ghost" id="btnWhats" href="#" target="_blank" rel="noopener">Pedir por WhatsApp</a>
-        <a class="btn btn-ghost" id="btnStore" href="index.html">Volver a la tienda</a>
+      <div class="btns" style="margin-top:14px">
+        <a class="btn btn-ghost" id="btnInvoice" href="#" target="_blank" rel="noopener" style="display:none">Descargar factura</a>
+        <a class="btn btn-ghost" id="btnStore" href="index.html" style="opacity:.5;pointer-events:none">Volver a la tienda</a>
       </div>
 
-      <div class="muted" style="margin-top:12px">
+      <div class="muted" id="hintExit" style="margin-top:12px">
+        ⚠️ No cierres esta página hasta enviar WhatsApp. Si sales, verás una advertencia.
+      </div>
+
+      <div class="muted" style="margin-top:12px; display:none" id="invoiceLinkWrap">
         Si no se abre la factura, copia y pega este link: <br>
         <code id="invoiceText"></code>
       </div>
@@ -174,11 +207,13 @@
       const lines = [];
 
       // Encabezado
+      const wantInvoice = !!(billing && (billing.name || billing.nit || billing.email || billing.tel));
       lines.push('Compra realizada ✅');
-      lines.push(`Cliente: ${billing?.name || name || 'Cliente'}`);
-      lines.push(`NIT/Razón social: ${billing?.nit || 'N/A'}`);
-      lines.push(`Correo: ${billing?.email || email || ''}`);
-      lines.push(`Tel: ${billing?.tel || tel || ''}`);
+      lines.push(`Factura ELC: ${wantInvoice ? 'SÍ' : 'NO'}`);
+      lines.push(`Cliente: ${wantInvoice ? (billing.name || name) : (name || 'Cliente')}`);
+      lines.push(`Correo: ${wantInvoice ? (billing.email || email || '') : (email || '')}`);
+      lines.push(`Tel: ${wantInvoice ? (billing.tel || tel || '') : (tel || '')}`);
+      if (wantInvoice) lines.push(`NIT/Razón social: ${billing.nit || ''}`);
       lines.push('');
 
       lines.push('Detalles de la compra:');
@@ -230,23 +265,20 @@
 
       return lines.join('\n');
     } catch (e) {
-      // fallback simple (igual pide datos fiscales)
-      return (
-        `Compra realizada ✅
-` +
-        `Orden #${orderId} · Pago ${paymentId}.
-` +
-        `Cliente: ${billing?.name || ''}
-` +
-        `NIT/Razón social: ${billing?.nit || ''}
-` +
-        `Correo: ${billing?.email || ''}
-` +
-        `Tel: ${billing?.tel || ''}
-
-` +
-        `Factura: ${invoiceUrl}`
-      );
+      // fallback simple si falla el fetch de la factura JSON
+      const wantInvoice = !!(billing && (billing.name || billing.nit || billing.email || billing.tel));
+      const parts = [];
+      parts.push('Compra realizada ✅');
+      parts.push(`Orden #${orderId} · Pago ${paymentId}.`);
+      parts.push(`Factura ELC: ${wantInvoice ? 'SÍ' : 'NO'}`);
+      if (wantInvoice) {
+        parts.push(`Cliente: ${billing.name || ''}`);
+        parts.push(`NIT/Razón social: ${billing.nit || ''}`);
+        parts.push(`Correo: ${billing.email || ''}`);
+        parts.push(`Tel: ${billing.tel || ''}`);
+      }
+      parts.push(`Factura: ${invoiceUrl}`);
+      return parts.join('\n');
     }
   }
 
@@ -309,11 +341,55 @@
       document.getElementById('meta').innerHTML = `Orden <b>#${orderId}</b> · Estado <b>${r.status}</b> · Payment <b>${paymentId}</b>`;
 
       const btnInvoice = document.getElementById('btnInvoice');
+      const invoiceText = document.getElementById('invoiceText');
+      const invoiceLinkWrap = document.getElementById('invoiceLinkWrap');
       btnInvoice.href = invoiceUrl;
-      document.getElementById('invoiceText').textContent = invoiceUrl;
+      if (invoiceText) invoiceText.textContent = invoiceUrl;
 
+      const btnStore = document.getElementById('btnStore');
+      const hintExit = document.getElementById('hintExit');
 
-      // Prefill datos de facturación desde localStorage
+      const billingBox = document.getElementById('billingBox');
+      const btnNeedInvoice = document.getElementById('btnNeedInvoice');
+      const btnWhats = document.getElementById('btnWhats');
+      const btnWhatsInvoice = document.getElementById('btnWhatsInvoice');
+      const btnCancelInvoice = document.getElementById('btnCancelInvoice');
+
+      const sentKey = `mr_whats_sent_${orderId}`;
+      const alreadySent = (() => { try { return localStorage.getItem(sentKey) === '1'; } catch { return false; } })();
+
+      function enableExit() {
+        if (btnStore) {
+          btnStore.style.opacity = '1';
+          btnStore.style.pointerEvents = 'auto';
+        }
+        if (btnInvoice) btnInvoice.style.display = 'inline-flex';
+        if (invoiceLinkWrap) invoiceLinkWrap.style.display = 'block';
+        if (hintExit) hintExit.innerHTML = '✅ WhatsApp enviado. Ya puedes volver a la tienda o descargar tu factura.';
+      }
+
+      function markSent() {
+        try { localStorage.setItem(sentKey, '1'); } catch (e) {}
+        enableExit();
+        window.removeEventListener('beforeunload', beforeUnloadGuard);
+      }
+
+      function beforeUnloadGuard(ev) {
+        // Evita que el usuario cierre sin registrar el pedido
+        const ok = (() => { try { return localStorage.getItem(sentKey) === '1'; } catch { return false; } })();
+        if (ok) return;
+        ev.preventDefault();
+        ev.returnValue = '';
+        return '';
+      }
+
+      if (!alreadySent) {
+        window.addEventListener('beforeunload', beforeUnloadGuard);
+      } else {
+        enableExit();
+      }
+
+      // Prefill datos de facturación desde localStorage (solo si piden Factura ELC)
       const billName = document.getElementById('billName');
       const billNit  = document.getElementById('billNit');
       const billEmail= document.getElementById('billEmail');
@@ -341,26 +417,53 @@
       });
 
       // ✅ IMPORTANTE: armar WhatsApp AL CLIC (evita caché y asegura el mensaje completo)
-      const btnWhats = document.getElementById('btnWhats');
+      async function openWhatsAppWith(billingOrNull) {
+        if (typeof showBusy === 'function') showBusy('Abriendo WhatsApp…');
+        const msg = await buildWhatsMsg({
+          invoiceUrl,
+          orderId,
+          paymentId,
+          statusFromConfirm: r.status,
+          billing: billingOrNull || null,
+        });
+        const url = `https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => { if (typeof hideBusy === 'function') hideBusy(); }, 600);
+        markSent();
+      }
+
+      // 1) Enviar WhatsApp (registrar pedido) - SIN exigir datos fiscales
       btnWhats.addEventListener('click', async (ev) => {
         ev.preventDefault();
-        btnWhats.textContent = 'Redirigiendo a WhatsApp...';
-        if (typeof showBusy === 'function') showBusy('Redirigiendo a WhatsApp…');
+        btnWhats.textContent = 'Abriendo WhatsApp…';
+        try { await openWhatsAppWith(null); }
+        finally { btnWhats.textContent = '📲 ENVIAR A WHATSAPP (REGISTRAR PEDIDO)'; }
+      });
 
+      // 2) Pedir Factura ELC: mostrar formulario y exigir datos
+      btnNeedInvoice.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        if (billingBox) billingBox.style.display = 'block';
+        billingBox?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      });
+
+      btnCancelInvoice.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        if (billingBox) billingBox.style.display = 'none';
+      });
+
+      btnWhatsInvoice.addEventListener('click', async (ev) => {
+        ev.preventDefault();
         const billing = {
-          name: (document.getElementById('billName')?.value || '').trim(),
-          nit:  (document.getElementById('billNit')?.value || '').trim(),
-          email:(document.getElementById('billEmail')?.value || '').trim(),
-          tel:  (document.getElementById('billTel')?.value || '').trim(),
+          name: (billName?.value || '').trim(),
+          nit:  (billNit?.value || '').trim(),
+          email:(billEmail?.value || '').trim(),
+          tel:  (billTel?.value || '').trim(),
         };
-
-        if (!billing.name || !billing.nit || !billing.email || !billing.tel){
-          alert('Por favor completa: Nombre, NIT/Razón social, Correo y Teléfono.');
-          btnWhats.textContent = 'Pedir por WhatsApp';
-          if (typeof hideBusy === 'function') hideBusy();
+        if (!billing.name || !billing.nit || !billing.email || !billing.tel) {
+          alert('Para pedir Factura ELC, completa: Nombre, NIT/Razón social, Correo y Teléfono.');
           return;
         }
-
         // guardar para la próxima compra
         try {
           localStorage.setItem('billing_name', billing.name);
@@ -369,23 +472,9 @@
           localStorage.setItem('billing_tel', billing.tel);
         } catch (e) {}
 
-        const msg = await buildWhatsMsg({
-          invoiceUrl,
-          orderId,
-          paymentId,
-          statusFromConfirm: r.status,
-          billing
-        });
-
-        const url = `https://wa.me/${WHATS_PHONE}?text=${encodeURIComponent(msg)}`;
-        window.open(url, '_blank', 'noopener');
-
-        // Ocultar loader después de abrir WhatsApp
-        setTimeout(() => {
-          if (typeof hideBusy === 'function') hideBusy();
-        }, 600);
-
-        btnWhats.textContent = 'Pedir por WhatsApp';
+        btnWhatsInvoice.textContent = 'Abriendo WhatsApp…';
+        try { await openWhatsAppWith(billing); }
+        finally { btnWhatsInvoice.textContent = '📲 ENVIAR A WHATSAPP Y PEDIR FACTURA'; }
       });
 
     } catch (e) {

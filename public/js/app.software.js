@@ -66,13 +66,43 @@
       .filter(Boolean);
   }
 
+  function extractFirstImage(raw){
+    // Acepta:
+    // - string con URLs separadas por , | ; \n
+    // - JSON array de objetos: [{type:'image',url:'...'}]
+    // - JSON array de strings: ['url1','url2']
+    const txt = String(raw || '').trim();
+    if (!txt) return '';
+
+    // JSON
+    if ((txt.startsWith('[') && txt.endsWith(']')) || (txt.startsWith('{') && txt.endsWith('}'))) {
+      try {
+        const j = JSON.parse(txt);
+        const arr = Array.isArray(j) ? j : (Array.isArray(j?.media) ? j.media : []);
+        if (Array.isArray(arr) && arr.length) {
+          // objetos
+          const imgObj = arr.find(x => x && typeof x === 'object' && String(x.type || x.kind || '').toLowerCase().includes('image') && (x.url || x.src));
+          if (imgObj) return String(imgObj.url || imgObj.src || '').trim();
+          // strings
+          const str = arr.find(x => typeof x === 'string' && x.trim());
+          if (str) return str.trim();
+        }
+      } catch {}
+    }
+
+    // String multi-url: coma, pipe, punto y coma o salto de línea
+    const parts = txt.split(/[\n\r,;|]+/g).map(s => s.trim()).filter(Boolean);
+    return parts[0] || '';
+  }
+
   function normalize(sw){
     const id = sw.softwareId ?? sw.software_id ?? sw.id ?? sw.slug ?? '';
     const name = sw.name || '';
     const desc = sw.shortDescription ?? sw.short_description ?? sw.desc ?? sw.description ?? '';
     const features = sw.features ?? '';
-    const imgRaw = sw.imageUrl ?? sw.image_url ?? sw.img ?? DEFAULT_IMG;
-    const img = resolveImgUrl(imgRaw);
+    const imgRaw = sw.imageUrl ?? sw.image_url ?? sw.img ?? sw.media ?? '';
+    const first = extractFirstImage(imgRaw);
+    const img = resolveImgUrl(first || DEFAULT_IMG);
     const tags = splitTags(sw.tags);
     return { id, name, desc, features, img, tags };
   }

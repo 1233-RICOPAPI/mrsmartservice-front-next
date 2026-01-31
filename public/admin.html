@@ -861,12 +861,7 @@
         </section>
 
         <section id="usersAdmin" class="admin-card admin-users-card"></section>
-
-        <!-- ============================
-              POSTVENTA — LICENCIAS
-        ============================ -->
-        <section id="licensesAdmin" class="admin-card admin-users-card"></section>
-      </div>
+</div>
 
       <!-- ============================
             TAB — TIENDA
@@ -1023,6 +1018,46 @@
         <button id="appConfirmOk" class="btn-danger" type="button">
           Aceptar
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREDENCIALES MODAL (para vincular una venta a un software) -->
+  <div id="credModal" class="modal-envio hidden" aria-modal="true" role="dialog" aria-labelledby="credModalTitle">
+    <div class="modal-envio-backdrop"></div>
+    <div class="modal-envio-dialog" style="max-width:680px">
+      <h2 id="credModalTitle">Credenciales de Software (para esta venta)</h2>
+      <p id="credSaleInfo" style="margin-top:-6px;color:#475569"></p>
+
+      <div class="field" style="margin-top:14px">
+        <label for="credSoftware">Software</label>
+        <select id="credSoftware"></select>
+      </div>
+
+      <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label for="credUser">Usuario</label>
+          <input id="credUser" placeholder="(vacío = auto)" />
+        </div>
+        <div class="field">
+          <label for="credPass">Clave</label>
+          <input id="credPass" placeholder="(vacío = auto)" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <button id="btnGenCred" class="btn btn-primary" type="button">Generar credenciales</button>
+        <button id="btnCopyCredMsg" class="btn btn-light" type="button" disabled>Copiar mensaje</button>
+        <a id="btnSendCredWa" class="btn btn-light" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.55">Enviar credenciales por WhatsApp</a>
+        <a id="btnOpenWaBuyer" class="btn btn-light" href="#" target="_blank" rel="noopener" style="pointer-events:none;opacity:.55">Abrir WhatsApp del cliente</a>
+        <button id="btnCloseCred" class="btn btn-light" type="button">Cerrar</button>
+      </div>
+
+      <div id="credResult" style="margin-top:14px;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;display:none">
+        <strong>Listo.</strong>
+        <div style="margin-top:6px">Usuario: <code id="credOutUser"></code></div>
+        <div>Clave: <code id="credOutPass"></code></div>
+        <small style="color:#64748b">* La clave solo se muestra al crear. Guárdala antes de cerrar.</small>
       </div>
     </div>
   </div>

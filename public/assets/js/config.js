@@ -11,8 +11,13 @@
   const guessed = isLocalhost ? DEFAULT_API_LOCAL : DEFAULT_API_PROD;
 
   function cleanBase(base) {
-    const b = String(base || '').trim();
-    return b.endsWith('/') ? b.slice(0, -1) : b;
+    let b = String(base || '').trim();
+    if (!b) return b;
+    // Quita trailing '/'
+    b = b.replace(/\/+$/, '');
+    // Mucha gente guarda ".../api" en localStorage; evitamos el bug "/api/api".
+    b = b.replace(/\/api$/i, '');
+    return b;
   }
 
   function resolveMediaUrl(url) {
@@ -34,8 +39,14 @@
     return `${base}${raw}`;
   }
 
+  const normalizedBase = cleanBase(saved || guessed);
+  // Si había un valor antiguo con "/api", lo migramos.
+  if (saved && normalizedBase && saved !== normalizedBase) {
+    try { localStorage.setItem('MR_API_BASE', normalizedBase); } catch {}
+  }
+
   window.MR_CONFIG = {
-    API_BASE: cleanBase(saved || guessed),
+    API_BASE: normalizedBase,
     WHATSAPP_NUMBER: '573014190633',
     COMPANY_NAME: 'MR SmartService',
     LOGO_SRC: '/assets/img/mr-logo-circle.png',
