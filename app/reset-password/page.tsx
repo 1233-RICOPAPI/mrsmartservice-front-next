@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function ResetPasswordRedirect() {
+function ResetPasswordRedirectInner() {
   const sp = useSearchParams();
 
   useEffect(() => {
@@ -13,4 +13,12 @@ export default function ResetPasswordRedirect() {
   }, [sp]);
 
   return null;
+}
+
+export default function ResetPasswordRedirect() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordRedirectInner />
+    </Suspense>
+  );
 }

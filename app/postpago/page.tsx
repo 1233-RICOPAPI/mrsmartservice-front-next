@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function PostpagoRedirect() {
+function PostpagoRedirectInner() {
   const sp = useSearchParams();
 
   useEffect(() => {
@@ -12,4 +12,12 @@ export default function PostpagoRedirect() {
   }, [sp]);
 
   return null;
+}
+
+export default function PostpagoRedirect() {
+  return (
+    <Suspense fallback={null}>
+      <PostpagoRedirectInner />
+    </Suspense>
+  );
 }

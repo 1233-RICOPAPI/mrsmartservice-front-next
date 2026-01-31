@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function LoginRedirect() {
+function LoginRedirectInner() {
   const sp = useSearchParams();
 
   useEffect(() => {
@@ -13,4 +13,12 @@ export default function LoginRedirect() {
   }, [sp]);
 
   return null;
+}
+
+export default function LoginRedirect() {
+  return (
+    <Suspense fallback={null}>
+      <LoginRedirectInner />
+    </Suspense>
+  );
 }
