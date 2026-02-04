@@ -68,7 +68,11 @@
     return url.pathname.endsWith("/" + name) || url.pathname.endsWith(name);
   };
 
-  const getToken = () => localStorage.getItem("token") || "";
+  const getToken = () =>
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("authToken") ||
+    "";
   const setToken = (t) => localStorage.setItem("token", t || "");
   const clearToken = () => localStorage.removeItem("token");
 

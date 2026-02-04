@@ -46,7 +46,8 @@ async function fetchCurrentUser() {
  * Construye headers de autorización con el token JWT, si existe.
  */
 function adminAuthHeaders(extra = {}) {
-  const t = getToken ? getToken() : null;
+  const getT = typeof getToken === 'function' ? getToken : (window && window.getToken);
+  const t = (getT && getT()) || '';
   return {
     'Content-Type': 'application/json',
     ...(t ? { Authorization: `Bearer ${t}` } : {}),
@@ -56,10 +57,16 @@ function adminAuthHeaders(extra = {}) {
 
 /**
  * Wrapper simple de fetch para API admin.
+ * SIEMPRE incluye Authorization: Bearer <token> en todas las peticiones.
  * En error, parsea el JSON de la respuesta y lanza Error con data adjunta.
  */
 async function apiFetch(path, options = {}) {
-  const res = await fetch(API + path, options);
+  const auth = adminAuthHeaders();
+  const isFormData = options.body && typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const authToMerge = isFormData && auth.Authorization ? { Authorization: auth.Authorization } : auth;
+  const mergedHeaders = { ...authToMerge, ...(options.headers || {}) };
+  const opts = { ...options, headers: mergedHeaders };
+  const res = await fetch(API + path, opts);
   const text = await res.text().catch(() => '');
   if (!res.ok) {
     let data = null;
@@ -1261,7 +1268,7 @@ function setOffline(arr) {
 
 async function fetchProducts() {
   try {
-    const res = await fetch(API + '/products');
+    const res = await fetch(API + '/products', { headers: adminAuthHeaders() });
     if (!res.ok) throw new Error('api');
     const data = await res.json();
     setOffline(data);
