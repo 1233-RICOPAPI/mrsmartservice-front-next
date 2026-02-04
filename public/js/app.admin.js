@@ -380,6 +380,121 @@ function initExportReportUI() {
   });
 }
 
+function initReportesUI() {
+  const egresosDesde = document.getElementById('egresosDesde');
+  const egresosHasta = document.getElementById('egresosHasta');
+  const btnEgresos = document.getElementById('btnActualizarEgresos');
+  const kpiEgresos = document.getElementById('kpiEgresos');
+  const kpiEgresosRango = document.getElementById('kpiEgresosRango');
+
+  const reportRange = document.getElementById('reportExportRange');
+  const reportMonth = document.getElementById('reportExportMonth');
+  const reportYear = document.getElementById('reportExportYear');
+  const reportMonthWrap = document.getElementById('reportExportMonthWrap');
+  const reportYearWrap = document.getElementById('reportExportYearWrap');
+  const reportFormat = document.getElementById('reportExportFormat');
+  const btnReportExport = document.getElementById('btnReportExport');
+  const linkIrVentas = document.getElementById('linkIrVentas');
+
+  // Default dates for egresos
+  const hoy = new Date();
+  const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  if (egresosDesde && !egresosDesde.value) egresosDesde.value = primerDia.toISOString().slice(0, 10);
+  if (egresosHasta && !egresosHasta.value) egresosHasta.value = hoy.toISOString().slice(0, 10);
+
+  async function loadEgresos() {
+    const desde = egresosDesde?.value || '';
+    const hasta = egresosHasta?.value || '';
+    try {
+      const params = new URLSearchParams();
+      if (desde) params.set('from', desde);
+      if (hasta) params.set('to', hasta);
+      const data = await apiFetch(`/stats/egresos?${params.toString()}`, { headers: adminAuthHeaders() });
+      const total = data?.totalEgresos ?? data?.totalDomicilios ?? 0;
+      if (kpiEgresos) kpiEgresos.textContent = money(total);
+      if (kpiEgresosRango) kpiEgresosRango.textContent = desde && hasta ? `${desde} a ${hasta}` : '';
+    } catch (e) {
+      if (kpiEgresos) kpiEgresos.textContent = '-';
+      showToast('Error cargando egresos', 'error');
+    }
+  }
+
+  if (btnEgresos) btnEgresos.addEventListener('click', loadEgresos);
+  loadEgresos();
+
+  // Export report (same logic as Estadísticas)
+  function fillReportMonths() {
+    if (!reportMonth) return;
+    const now = new Date();
+    reportMonth.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const opt = document.createElement('option');
+      opt.value = `${y}-${m}`;
+      opt.textContent = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+      if (i === 0) opt.selected = true;
+      reportMonth.appendChild(opt);
+    }
+  }
+  function fillReportYears() {
+    if (!reportYear) return;
+    const now = new Date().getFullYear();
+    reportYear.innerHTML = '';
+    for (let y = now; y >= now - 5; y--) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      if (y === now) opt.selected = true;
+      reportYear.appendChild(opt);
+    }
+  }
+  fillReportMonths();
+  fillReportYears();
+
+  if (reportRange) reportRange.addEventListener('change', () => {
+    const isMonth = reportRange.value === 'month';
+    if (reportMonthWrap) reportMonthWrap.style.display = isMonth ? '' : 'none';
+    if (reportYearWrap) reportYearWrap.style.display = isMonth ? 'none' : '';
+  });
+
+  if (btnReportExport) btnReportExport.addEventListener('click', async () => {
+    const range = reportRange?.value || 'month';
+    const format = (reportFormat?.value) || 'xlsx';
+    const params = new URLSearchParams({ range, format });
+    if (range === 'month') params.set('month', reportMonth?.value || '');
+    else params.set('year', reportYear?.value || '');
+    if ((range === 'month' && !reportMonth?.value) || (range === 'year' && !reportYear?.value)) {
+      showToast('Selecciona mes o año', 'error');
+      return;
+    }
+    try {
+      btnReportExport.disabled = true;
+      const res = await fetch(API + '/reports/export?' + params.toString(), { headers: adminAuthHeaders() });
+      if (!res.ok) throw new Error('Error exportando');
+      const blob = await res.blob();
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="?([^";]+)"?/)?.[1] || `reporte.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Descarga iniciada', 'success');
+    } catch (e) {
+      showToast(e?.message || 'No se pudo descargar', 'error');
+    } finally {
+      btnReportExport.disabled = false;
+    }
+  });
+
+  if (linkIrVentas) linkIrVentas.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tabBtn = document.querySelector('.tab-btn[data-tab="tab-ventas"]');
+    if (tabBtn) tabBtn.click();
+  });
+}
+
 async function initVentasUI() {
   const tbody        = document.getElementById('ventasBody');
   const empty        = document.getElementById('ventasEmpty');
@@ -433,6 +548,7 @@ async function initVentasUI() {
                 <td>${cliente}</td>
                 <td>${escapeHtml(total)}</td>
                 <td>${escapeHtml(String(o.status))}</td>
+                <td><button type="button" class="btn btn-sm btn-light btn-factura" data-order-id="${o.order_id}">Ver factura</button></td>
                 <td class="right">
                   <button type="button" class="btn btn-light btn-cred" data-order='${encodeURIComponent(JSON.stringify(o))}'>Credenciales</button>
                 </td>
@@ -449,7 +565,7 @@ async function initVentasUI() {
     } catch (err) {
       console.error('Error cargando ventas:', err);
       tbody.innerHTML = `
-        <tr><td colspan="6">Error cargando ventas.</td></tr>
+        <tr><td colspan="7">Error cargando ventas.</td></tr>
       `;
       if (empty) empty.hidden = true;
       if (infoVentas) infoVentas.textContent = 'Página 1 de 1';
@@ -473,15 +589,35 @@ async function initVentasUI() {
 
   // acciones (delegación)
   tbody.addEventListener('click', async (ev) => {
-    const btn = ev.target?.closest?.('.btn-cred');
-    if (!btn) return;
-    ev.preventDefault();
-    const raw = btn.getAttribute('data-order') || '';
-    let order;
-    try { order = JSON.parse(decodeURIComponent(raw)); } catch { order = null; }
-    if (!order) return;
-    await openCredModal(order);
+    const btnCred = ev.target?.closest?.('.btn-cred');
+    const btnFactura = ev.target?.closest?.('.btn-factura');
+    if (btnCred) {
+      ev.preventDefault();
+      const raw = btnCred.getAttribute('data-order') || '';
+      let order;
+      try { order = JSON.parse(decodeURIComponent(raw)); } catch { order = null; }
+      if (!order) return;
+      await openCredModal(order);
+      return;
+    }
+    if (btnFactura) {
+      ev.preventDefault();
+      const orderId = btnFactura.getAttribute('data-order-id');
+      if (orderId) await openFacturaModal(Number(orderId));
+    }
   });
+
+  // Filtros por fechas: valor por defecto (inicio de mes a hoy)
+  const hoy = new Date();
+  const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const ventaDesdeEl = document.getElementById('ventaDesde');
+  const ventaHastaEl = document.getElementById('ventaHasta');
+  if (ventaDesdeEl && !ventaDesdeEl.value) {
+    ventaDesdeEl.value = primerDia.toISOString().slice(0, 10);
+  }
+  if (ventaHastaEl && !ventaHastaEl.value) {
+    ventaHastaEl.value = hoy.toISOString().slice(0, 10);
+  }
 }
 
 // =========================
@@ -639,6 +775,50 @@ async function openCredModal(order) {
   });
 
   showCredModal(true);
+}
+
+// =========================
+// MODAL: Detalle factura por orden
+// =========================
+async function openFacturaModal(orderId) {
+  const modal = document.getElementById('facturaModal');
+  const body = document.getElementById('facturaModalBody');
+  const btnClose = document.getElementById('btnCloseFactura');
+  if (!modal || !body) return;
+
+  body.innerHTML = '<p>Cargando factura…</p>';
+  modal.classList.remove('hidden');
+  if (btnClose) btnClose.onclick = closeFacturaModal;
+  const backdrop = modal.querySelector('.modal-envio-backdrop');
+  if (backdrop) backdrop.onclick = closeFacturaModal;
+
+  try {
+    const data = await apiFetch(`/invoices/admin/${orderId}`, { headers: adminAuthHeaders() });
+    const ord = data?.order || {};
+    const items = data?.items || [];
+    const company = data?.company || {};
+
+    let html = `<div class="invoice-detail" style="font-size:14px">
+      <p><strong>Orden #${ord.order_id || orderId}</strong> · ${ord.status || '-'}</p>
+      <p>Cliente: ${escapeHtml(ord.customer_name || '-')} · ${escapeHtml(ord.customer_email || '-')}</p>
+      <p>Total: ${money(ord.total_amount || 0)}</p>
+      <table class="smart-table" style="margin-top:12px;width:100%">
+        <thead><tr><th>Producto</th><th>Cant.</th><th>P.Unit</th><th>Total</th></tr></thead>
+        <tbody>`;
+    items.forEach((it) => {
+      const total = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
+      html += `<tr><td>${escapeHtml(it.name || '-')}</td><td>${it.quantity || 0}</td><td>${money(it.unit_price || 0)}</td><td>${money(total)}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<p style="color:#dc2626">No se pudo cargar la factura: ${escapeHtml(e?.message || 'Error')}</p>`;
+  }
+}
+
+function closeFacturaModal() {
+  const modal = document.getElementById('facturaModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 
@@ -2331,6 +2511,9 @@ function initAdminPanel() {
       case 'tab-estadisticas':
         initStatsUI?.();
         initExportReportUI?.();
+        break;
+      case 'tab-reportes':
+        initReportesUI?.();
         break;
       case 'tab-perfil':
         initProfileAdminUI?.();

@@ -260,6 +260,18 @@
         >
           Estadísticas
         </button>
+        <!-- Reportes/Finanzas: admin, dev, contador -->
+        <button
+          id="tab-reportes-tab"
+          class="tab-btn hide-for-user"
+          data-tab="tab-reportes"
+          role="tab"
+          type="button"
+          aria-selected="false"
+          aria-controls="tab-reportes"
+        >
+          Reportes / Finanzas
+        </button>
         <!-- Perfil/Usuarios solo staff -->
         <button
           id="tab-perfil-tab"
@@ -726,13 +738,14 @@
 
           <div class="table-wrap">
             <table class="smart-table" id="tablaVentas">
-              <thead>
+                <thead>
                 <tr>
                   <th scope="col">Fecha</th>
                   <th scope="col">Orden</th>
                   <th scope="col">Cliente</th>
                   <th scope="col">Total</th>
                   <th scope="col">Estado</th>
+                  <th scope="col">Factura</th>
                   <th scope="col" class="right">Acciones</th>
                 </tr>
               </thead>
@@ -847,8 +860,81 @@
         </section>
       </div>
 
+      <!-- ============================
+            TAB — REPORTES / FINANZAS
+      ============================ -->
+      <div
+        id="tab-reportes"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tab-reportes-tab"
+        hidden
+      >
+        <section class="panel">
+          <header class="panel-head">
+            <h2>Reportes y Finanzas</h2>
+            <p class="text-muted">Resumen de egresos, exportación y detalle de facturas por orden.</p>
+          </header>
 
-      
+          <div class="stats-grid" style="margin-bottom:1.5rem;">
+            <div class="kpi">
+              <span>Egresos (domicilios)</span>
+              <strong id="kpiEgresos">$0</strong>
+              <small id="kpiEgresosRango" class="text-muted"></small>
+            </div>
+          </div>
+
+          <div class="filters" id="filtrosEgresos" style="flex-wrap:wrap; gap:0.75rem; margin-bottom:1.5rem;">
+            <div class="field">
+              <label for="egresosDesde">Desde</label>
+              <input type="date" id="egresosDesde" />
+            </div>
+            <div class="field">
+              <label for="egresosHasta">Hasta</label>
+              <input type="date" id="egresosHasta" />
+            </div>
+            <button type="button" class="btn btn-primary" id="btnActualizarEgresos">Actualizar egresos</button>
+          </div>
+
+          <section class="panel" style="margin-top:1.5rem;">
+            <h3>Exportar reporte contable</h3>
+            <p class="text-muted">Ingresos del período, 20% y cantidad de ventas. Excel o PDF.</p>
+            <div class="filters" style="flex-wrap:wrap; gap:0.75rem;">
+              <div class="field">
+                <label for="reportExportRange">Rango</label>
+                <select id="reportExportRange" name="reportExportRange">
+                  <option value="month">Por mes</option>
+                  <option value="year">Por año</option>
+                </select>
+              </div>
+              <div class="field" id="reportExportMonthWrap">
+                <label for="reportExportMonth">Mes</label>
+                <select id="reportExportMonth" name="reportExportMonth"></select>
+              </div>
+              <div class="field" id="reportExportYearWrap" style="display:none;">
+                <label for="reportExportYear">Año</label>
+                <select id="reportExportYear" name="reportExportYear"></select>
+              </div>
+              <div class="field">
+                <label for="reportExportFormat">Formato</label>
+                <select id="reportExportFormat" name="reportExportFormat">
+                  <option value="xlsx">Excel (.xlsx)</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:flex-end;">
+                <button type="button" class="btn btn-primary" id="btnReportExport">Descargar</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" style="margin-top:1.5rem;">
+            <h3>Detalle de facturas por orden</h3>
+            <p class="text-muted">En la pestaña <strong>Ventas</strong> puedes ver cada orden y usar el botón "Ver factura" para el detalle completo de la factura.</p>
+            <p><a href="#" id="linkIrVentas" class="btn btn-light">Ir a Ventas</a></p>
+          </section>
+        </section>
+      </div>
 
       <!-- ============================
             TAB — PERFIL + USUARIOS
@@ -1117,6 +1203,18 @@
     </div>
   </div>
 
+  <!-- MODAL DETALLE FACTURA -->
+  <div id="facturaModal" class="modal-envio hidden" aria-modal="true" role="dialog" aria-labelledby="facturaModalTitle">
+    <div class="modal-envio-backdrop"></div>
+    <div class="modal-envio-dialog" style="max-width:720px; max-height:90vh; overflow:auto">
+      <h2 id="facturaModalTitle">Detalle factura</h2>
+      <div id="facturaModalBody" style="margin-top:12px"></div>
+      <div style="margin-top:14px">
+        <button id="btnCloseFactura" class="btn btn-light" type="button">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- FOOTER -->
   <div id="app-footer"></div>
 
@@ -1193,7 +1291,7 @@
         if (role === "CONTADOR") {
           document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
             const tab = btn.dataset.tab;
-            const show = ['tab-ventas', 'tab-estadisticas', 'tab-perfil'].includes(tab);
+            const show = ['tab-ventas', 'tab-estadisticas', 'tab-reportes'].includes(tab);
             btn.style.display = show ? '' : 'none';
           });
           const firstVisible = document.querySelector('.tab-btn[data-tab="tab-ventas"]');
