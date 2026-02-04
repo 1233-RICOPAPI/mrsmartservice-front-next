@@ -35,11 +35,26 @@ async function fetchReviews(productId) {
   }
 }
 
+function getOrCreateDeviceId() {
+  const key = 'mr_device_id';
+  try {
+    let id = localStorage.getItem(key);
+    if (!id || id.length < 8) {
+      id = 'mr_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return 'mr_anon_' + Date.now();
+  }
+}
+
 async function postReview(productId, body) {
   const payload = {
     author: body.name || body.author || 'Anónimo',
     rating: body.rating,
-    comment: body.comment
+    comment: body.comment,
+    device_id: getOrCreateDeviceId()
   };
 
   try {
@@ -50,6 +65,9 @@ async function postReview(productId, body) {
     });
     return data;
   } catch (e) {
+    if (e?.message && (e.message.includes('already_reviewed') || e.message.includes('409'))) {
+      throw { status: 409, message: 'Ya has dejado una opinión para este producto. Solo se permite una calificación por producto.' };
+    }
     console.warn('Error enviando reseña a la API, guardo en localStorage:', e);
     try {
       const lsKey = lsKeyReviews(productId);
@@ -191,9 +209,17 @@ async function initReviews(productId) {
         return;
       }
 
-      await postReview(productId, { name, rating, comment });
-      showToast('¡Gracias por tu opinión!');
-      form.reset();
+      try {
+        await postReview(productId, { name, rating, comment });
+        showToast('¡Gracias por tu opinión!');
+        form.reset();
+      } catch (err) {
+        if (err?.status === 409 || (err?.message && err.message.includes('Ya has dejado'))) {
+          showToast(err?.message || 'Ya has dejado una opinión para este producto.', 'error');
+          return;
+        }
+        throw err;
+      }
 
       ratingInput.value = '';
       const box = document.getElementById('ratingStarsInput');

@@ -56,14 +56,21 @@ function adminAuthHeaders(extra = {}) {
 
 /**
  * Wrapper simple de fetch para API admin.
+ * En error, parsea el JSON de la respuesta y lanza Error con data adjunta.
  */
 async function apiFetch(path, options = {}) {
   const res = await fetch(API + path, options);
+  const text = await res.text().catch(() => '');
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
-    throw new Error(`Error API ${path}: ${res.status} ${msg}`);
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch {}
+    const msg = (data && (data.message || data.error)) || text || `Error API ${path}: ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
-  return res.json();
+  try { return text ? JSON.parse(text) : null; } catch { return null; }
 }
 
 /**
@@ -259,11 +266,11 @@ async function initStatsUI() {
 
             return `
               <div class="mini-bar">
-                <span class="mini-bar-label">${p.label}</span>
+                <span class="mini-bar-label">${escapeHtml(String(p.label))}</span>
                 <div class="mini-bar-track">
                   <div class="mini-bar-fill" style="width:${pct}%;"></div>
                 </div>
-                <span class="mini-bar-value">${money(value)}</span>
+                <span class="mini-bar-value">${escapeHtml(money(value))}</span>
               </div>
             `;
           })
@@ -284,6 +291,93 @@ async function initStatsUI() {
 
   // carga inicial
   loadStats();
+}
+
+function initExportReportUI() {
+  const exportRange = document.getElementById('exportRange');
+  const exportMonth = document.getElementById('exportMonth');
+  const exportYear = document.getElementById('exportYear');
+  const exportMonthWrap = document.getElementById('exportMonthWrap');
+  const exportYearWrap = document.getElementById('exportYearWrap');
+  const exportFormat = document.getElementById('exportFormat');
+  const btnExport = document.getElementById('btnExportReport');
+
+  if (!exportRange || !exportMonth || !exportYear || !btnExport) return;
+
+  function fillMonths() {
+    const now = new Date();
+    exportMonth.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const val = `${y}-${m}`;
+      const label = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = label;
+      if (i === 0) opt.selected = true;
+      exportMonth.appendChild(opt);
+    }
+  }
+
+  function fillYears() {
+    const now = new Date().getFullYear();
+    exportYear.innerHTML = '';
+    for (let y = now; y >= now - 5; y--) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      if (y === now) opt.selected = true;
+      exportYear.appendChild(opt);
+    }
+  }
+
+  fillMonths();
+  fillYears();
+
+  exportRange.addEventListener('change', () => {
+    const isMonth = exportRange.value === 'month';
+    if (exportMonthWrap) exportMonthWrap.style.display = isMonth ? '' : 'none';
+    if (exportYearWrap) exportYearWrap.style.display = isMonth ? 'none' : '';
+  });
+
+  btnExport.addEventListener('click', async () => {
+    const range = exportRange.value || 'month';
+    const format = (exportFormat && exportFormat.value) || 'xlsx';
+    const params = new URLSearchParams({ range, format });
+    if (range === 'month') params.set('month', exportMonth.value || '');
+    else params.set('year', exportYear.value || '');
+
+    if ((range === 'month' && !exportMonth.value) || (range === 'year' && !exportYear.value)) {
+      showToast('Selecciona mes o año', 'error');
+      return;
+    }
+
+    try {
+      btnExport.disabled = true;
+      const res = await fetch(API + '/reports/export?' + params.toString(), {
+        headers: adminAuthHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Error exportando');
+      }
+      const blob = await res.blob();
+      const filename = res.headers.get('Content-Disposition')?.match(/filename="?([^";]+)"?/)?.[1] || `reporte-${range}-${range === 'month' ? exportMonth.value : exportYear.value}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Descarga iniciada', 'success');
+    } catch (e) {
+      console.error('Export error:', e);
+      showToast(e?.message || 'No se pudo descargar el reporte', 'error');
+    } finally {
+      btnExport.disabled = false;
+    }
+  });
 }
 
 async function initVentasUI() {
@@ -330,15 +424,15 @@ async function initVentasUI() {
               ? new Date(o.created_at).toLocaleString('es-CO')
               : '';
             const total = money(o.total_amount || 0);
-            const cliente = o.domicilio_nombre || o.email || '-';
+            const cliente = escapeHtml((o.buyer_name || o.domicilio_nombre || o.buyer_email || o.email || '-').trim() || '-');
 
             return `
               <tr>
-                <td>${fecha}</td>
-                <td>${o.order_id}</td>
+                <td>${escapeHtml(fecha)}</td>
+                <td>${escapeHtml(String(o.order_id))}</td>
                 <td>${cliente}</td>
-                <td>${total}</td>
-                <td>${o.status}</td>
+                <td>${escapeHtml(total)}</td>
+                <td>${escapeHtml(String(o.status))}</td>
                 <td class="right">
                   <button type="button" class="btn btn-light btn-cred" data-order='${encodeURIComponent(JSON.stringify(o))}'>Credenciales</button>
                 </td>
@@ -552,7 +646,7 @@ async function openCredModal(order) {
  * ADMIN PERFIL / CAMBIO DE CONTRASEÑA
  ********************/
 
-function initPerfilUsuario() {
+async function initPerfilUsuario() {
   // Coincide con admin.html
   const form = document.getElementById('formChangePassword');
   if (!form) return;
@@ -614,11 +708,106 @@ function initPerfilUsuario() {
       setMsg('Error de conexión al cambiar la contraseña');
     }
   });
+
+  const contadorCard = document.getElementById('contadorAdminCard');
+  const contadorForm = document.getElementById('formContadorAccount');
+  if (contadorCard && contadorForm) {
+    const roleUpper = window.adminCurrentUser ? String(window.adminCurrentUser.role).toUpperCase() : '';
+    if (!['ADMIN', 'DEV_ADMIN'].includes(roleUpper)) {
+      contadorCard.style.display = 'none';
+    } else {
+      contadorCard.style.display = '';
+      const emailInput = document.getElementById('contadorEmail');
+      const passwordInput = document.getElementById('contadorPassword');
+      const msgNode = document.getElementById('contadorMsg');
+      const setContadorMsg = (txt, ok = false) => {
+        if (msgNode) {
+          msgNode.textContent = txt;
+          msgNode.style.color = ok ? '#16a34a' : '#dc2626';
+        } else {
+          showToast(txt, ok ? 'success' : 'error');
+        }
+      };
+
+      try {
+        const info = await adminFetchContadorAccount();
+        if (info?.email && emailInput) {
+          emailInput.value = info.email;
+        }
+      } catch (err) {
+        console.error('Error cargando datos del contador:', err);
+        setContadorMsg('No se pudo cargar el correo actual del contador');
+      }
+
+      contadorForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setContadorMsg('');
+
+        const submitBtn = contadorForm.querySelector('button[type="submit"]');
+        const payload = {};
+        const emailVal = emailInput ? emailInput.value.trim() : '';
+        const passVal = passwordInput ? passwordInput.value.trim() : '';
+
+        if (emailVal) payload.email = emailVal;
+        if (passVal) payload.password = passVal;
+
+        if (!payload.email && !payload.password) {
+          setContadorMsg('Ingresa un correo o una nueva contraseña.');
+          return;
+        }
+
+        try {
+          if (submitBtn) submitBtn.disabled = true;
+          const updated = await adminUpdateContadorAccount(payload);
+          if (updated?.email && emailInput) {
+            emailInput.value = updated.email;
+          }
+          if (passwordInput) passwordInput.value = '';
+          setContadorMsg('Datos del contador actualizados correctamente.', true);
+          showToast('Cuenta del contador actualizada', 'success');
+        } catch (err) {
+          console.error('Error actualizando contador:', err);
+          const message = err?.message || 'No se pudo actualizar la cuenta del contador';
+          setContadorMsg(message);
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+  }
 }
 
 // Compat: el panel llama initProfileAdminUI, pero la función real aquí es initPerfilUsuario
 function initProfileAdminUI() {
   initPerfilUsuario();
+}
+
+/********************
+ * CONTADOR ACCOUNT HELPERS
+ ********************/
+
+async function adminFetchContadorAccount() {
+  const res = await fetch(API + '/users/contador', {
+    headers: adminAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('contador_fetch_failed');
+  return res.json();
+}
+
+async function adminUpdateContadorAccount(body) {
+  const res = await fetch(API + '/users/contador', {
+    method: 'PATCH',
+    headers: adminAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message || data?.error || 'No se pudo actualizar la cuenta del contador';
+    const err = new Error(msg);
+    err.data = data;
+    throw err;
+  }
+  return data;
 }
 
 /********************
@@ -656,11 +845,11 @@ function renderAdsTable(list) {
         : '';
       const statusLabel = ad.active ? 'Activo' : 'Inactivo';
       return `
-        <tr data-id="${ad.ad_id}">
-          <td>${ad.ad_id}</td>
-          <td>${ad.title}</td>
-          <td>${statusLabel}</td>
-          <td>${created}</td>
+        <tr data-id="${escapeHtml(String(ad.ad_id))}">
+          <td>${escapeHtml(String(ad.ad_id))}</td>
+          <td>${escapeHtml(String(ad.title))}</td>
+          <td>${escapeHtml(statusLabel)}</td>
+          <td>${escapeHtml(created)}</td>
           <td class="right">
             <button type="button" class="btn btn-light btn-sm" data-op="edit">Editar</button>
             <button type="button" class="btn btn-light btn-sm" data-op="toggle">
@@ -784,14 +973,22 @@ function initAdsAdminUI() {
         }),
       });
 
-      if (!res.ok) throw new Error('ads_save_failed');
+      const text = await res.text().catch(() => '');
+      let errData = null;
+      try { errData = text ? JSON.parse(text) : null; } catch {}
+      if (!res.ok) {
+        const e = new Error((errData && (errData.message || errData.error)) || text || 'ads_save_failed');
+        e.data = errData;
+        throw e;
+      }
 
       showToast(isEdit ? 'Anuncio actualizado' : 'Anuncio creado', 'success');
       resetForm();
       await loadAdsAdminUI();
     } catch (err) {
       console.error('Error guardando anuncio:', err);
-      showToast('No se pudo guardar el anuncio', 'error');
+      const msg = (err.data && err.data.message) || err.message || 'No se pudo guardar el anuncio';
+      showToast(msg, 'error');
     }
   });
 
@@ -1104,7 +1301,7 @@ const data = adminApplyProductsFilter(allData);
     cards.innerHTML = data.map(p => {
       const media = adminParseMediaFromProduct(p);
       const firstImage = media.find(m => m.type === 'image' && m.url) || null;
-      const img  = firstImage ? resolveImg(firstImage.url) : 'https://via.placeholder.com/300x200?text=Producto';
+      const img  = firstImage ? resolveImg(firstImage.url) : '/assets/img/default-product.svg';
 
       // ⭐ RATING
       const rating = Number(p.avg_rating || 0);
@@ -1135,14 +1332,14 @@ const data = adminApplyProductsFilter(allData);
       return `
         <div class="product-card" data-id="${p.product_id}">
           <div class="product-card-img">
-            <img src="${img}" alt="${p.name}">
+            <img src="${escapeHtml(img)}" alt="${escapeHtml(String(p.name))}">
           </div>
           <div class="product-card-body">
-            <h3>${p.name}</h3>
-            <p class="prod-cat">${p.category || 'General'}</p>
-            <p class="prod-price">${money(p.price || 0)}</p>
-            <p class="prod-stock">Stock: ${p.stock || 0}</p>
-            <p class="prod-desc">${p.description || ''}</p>
+            <h3>${escapeHtml(String(p.name))}</h3>
+            <p class="prod-cat">${escapeHtml(p.category || 'General')}</p>
+            <p class="prod-price">${escapeHtml(money(p.price || 0))}</p>
+            <p class="prod-stock">Stock: ${escapeHtml(String(p.stock || 0))}</p>
+            <p class="prod-desc">${escapeHtml(String(p.description || ''))}</p>
             ${ratingHtml}
             <div class="product-card-actions">
               ${adminButtons}
@@ -1567,10 +1764,10 @@ function renderCreds(rows) {
     .map((c) => {
       const created = c.created_at ? new Date(c.created_at).toLocaleString('es-CO') : '';
       return `
-        <tr data-id="${c.credential_id}">
-          <td>${c.credential_id}</td>
-          <td>${c.username}</td>
-          <td>${created}</td>
+        <tr data-id="${escapeHtml(String(c.credential_id))}">
+          <td>${escapeHtml(String(c.credential_id))}</td>
+          <td>${escapeHtml(String(c.username))}</td>
+          <td>${escapeHtml(created)}</td>
           <td class="right">
             <button class="btn btn-sm btn-danger btn-del-cred">Eliminar</button>
           </td>
@@ -1787,11 +1984,11 @@ function renderDomicilios(list) {
       const active = (s.active ?? true) ? 'Sí' : 'No';
 
       return `
-        <tr data-id="${id}">
-          <td>${id}</td>
+        <tr data-id="${escapeHtml(String(id))}">
+          <td>${escapeHtml(String(id))}</td>
           <td>${escapeHtml(name)}</td>
           <td>${escapeHtml(tags)}</td>
-          <td>${active}</td>
+          <td>${escapeHtml(active)}</td>
           <td style="white-space:nowrap">
             <button type="button" class="btn-secondary btn-edit-sw">Editar</button>
             <button type="button" class="btn-danger btn-del-sw">Eliminar</button>
@@ -2055,7 +2252,8 @@ async function initDomiciliosUI() {
             await loadAll();
           } catch (err) {
             console.error('Error eliminando software:', err);
-            showToast('No se pudo eliminar el software', 'error');
+            const msg = (err.data && err.data.message) || err.message || 'No se pudo eliminar el software';
+            showToast(msg, 'error');
           }
         },
       });
@@ -2132,6 +2330,7 @@ function initAdminPanel() {
         break;
       case 'tab-estadisticas':
         initStatsUI?.();
+        initExportReportUI?.();
         break;
       case 'tab-perfil':
         initProfileAdminUI?.();

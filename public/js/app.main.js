@@ -30,7 +30,7 @@ async function protectAdminPage() {
   const role = String(user.role || '').toUpperCase();
 
   // 👉 Ahora dejamos pasar ADMIN, DEV_ADMIN y USER
-  const allowed = ['ADMIN', 'DEV_ADMIN', 'USER'];
+  const allowed = ['ADMIN', 'DEV_ADMIN', 'USER', 'CONTADOR'];
   if (!allowed.includes(role)) {
     location.href = 'index.html';
     return user;

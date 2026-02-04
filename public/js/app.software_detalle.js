@@ -197,10 +197,22 @@
       return;
     }
 
+    const base = (window.API || window.MR?.API || '').toString().replace(/\/+$/, '') ||
+      (window.MR_CONFIG?.API_BASE ? String(window.MR_CONFIG.API_BASE).replace(/\/+$/, '').replace(/\/api$/, '') + '/api' : '');
+    if (!base) {
+      card.innerHTML = '<p style="color:#6b7280">API no configurada. Verifica que app.config.js esté cargado.</p>';
+      return;
+    }
+
     try {
-      const base = (typeof apiBase === 'function' ? apiBase() : (window.API ? (String(window.API).replace(/\/+$/, '') + '/api') : ''));
-      const res = await fetch(base + `/softwares/${n}`, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) throw new Error('http_' + res.status);
+      const res = await fetch(base + '/softwares/' + n, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) {
+        if (res.status === 404) {
+          card.innerHTML = '<p style="color:#6b7280">Software no encontrado o no está disponible.</p>';
+          return;
+        }
+        throw new Error('http_' + res.status);
+      }
       const sw = await res.json();
       render(sw);
     } catch (err) {

@@ -356,6 +356,10 @@ function openCheckoutModal(items) {
   // Total inicial (sin envío)
   if (totalEl) totalEl.textContent = money(checkoutSubtotal);
 
+  // Reset checkbox de términos al abrir
+  const acceptTermsEl = document.getElementById('acceptTerms');
+  if (acceptTermsEl) acceptTermsEl.checked = false;
+
   // Si hay pref marcada, recalcula para habilitar/bloquear botón correctamente
   recalcularEnvioYTotal();
 
@@ -369,8 +373,7 @@ function closeCheckoutModal() {
 
 /**
  * Recalcula costo de envío y total visual
- * - Villavicencio: domicilio $7.000
- * - Fuera de Villavicencio: contraentrega (sin cobro de envío en la web)
+ * - Domicilio: contraentrega (Coordinator/Interapidísimo). El cliente paga el envío al recibir; no se cobra en la web.
  * - Retiro en punto: gratis
  */
 function recalcularEnvioYTotal() {
@@ -391,7 +394,7 @@ function recalcularEnvioYTotal() {
   let envioCosto = 0;
   shippingAllowed = false;
 
-  const ciudad = ciudadInput ? ciudadInput.value : '';
+  const termsCheck = document.getElementById('acceptTerms');
 
   // Si NO eligió nada todavía:
   if ((!radioDom || !radioDom.checked) && (!radioLocal || !radioLocal.checked)) {
@@ -407,25 +410,16 @@ function recalcularEnvioYTotal() {
     return;
   }
 
-  // Si elige DOMICILIO
+  // Si elige DOMICILIO: contraentrega, sin cobro en web (el cliente paga al recibir)
   if (radioDom && radioDom.checked) {
-    if (esVillavicencio(ciudad)) {
-      envioCosto = 7000;
-      shippingAllowed = true;
-      if (shippingTextEl) {
-        shippingTextEl.textContent = '$ 7.000 (domicilio Villavicencio)';
-        shippingTextEl.style.color = '#333';
-      }
-    } else {
-      envioCosto = 0;
-      // ✅ Fuera de Villavicencio: se maneja contraentrega, sin cobro de envío
-      shippingAllowed = true;
-      if (shippingTextEl) {
-        shippingTextEl.textContent = 'Contraentrega (fuera de Villavicencio, sin cobro de envío)';
-        shippingTextEl.style.color = '#333';
-      }
+    envioCosto = 0;
+    shippingAllowed = true;
+    if (shippingTextEl) {
+      shippingTextEl.textContent = 'Contraentrega (Coordinator/Interapidísimo). El cliente paga el envío al recibir.';
+      shippingTextEl.style.color = '#333';
     }
     if (formWrap) formWrap.classList.remove('hidden');
+    if (noticeEl) noticeEl.classList.add('hidden');
   }
 
   // Si elige RETIRO EN PUNTO
@@ -437,14 +431,13 @@ function recalcularEnvioYTotal() {
       shippingTextEl.style.color = '#00a650';
     }
     if (formWrap) formWrap.classList.add('hidden');
+    if (noticeEl) noticeEl.classList.add('hidden');
   }
 
   currentShippingCost = envioCosto;
 
-  if (btnConfirmEl) btnConfirmEl.disabled = !shippingAllowed;
-  // Mostrar aviso SOLO cuando es domicilio fuera de Villavicencio
-  const showNotice = Boolean(radioDom && radioDom.checked && !esVillavicencio(ciudad));
-  if (noticeEl) noticeEl.classList.toggle('hidden', !showNotice);
+  const termsAccepted = termsCheck ? termsCheck.checked : false;
+  if (btnConfirmEl) btnConfirmEl.disabled = !shippingAllowed || !termsAccepted;
 
   const total = checkoutSubtotal + envioCosto;
   if (totalEl) totalEl.textContent = money(total);
@@ -494,6 +487,12 @@ function collectShippingData(mode) {
 }
 
 async function startCheckoutWithShipping(mode) {
+  const termsCheck = document.getElementById('acceptTerms');
+  if (!termsCheck || !termsCheck.checked) {
+    showToast('Debes aceptar los términos y condiciones para continuar');
+    return;
+  }
+
   if (!shippingAllowed) {
     showToast('Elige una forma de entrega válida para continuar');
     return;
@@ -615,6 +614,12 @@ function initCheckoutModal() {
         recalcularEnvioYTotal();
       }
     });
+  }
+
+  // Aceptación de términos: habilitar Continuar solo si acepta
+  const acceptTermsEl = document.getElementById('acceptTerms');
+  if (acceptTermsEl) {
+    acceptTermsEl.addEventListener('change', () => recalcularEnvioYTotal());
   }
 
   // Botón Continuar

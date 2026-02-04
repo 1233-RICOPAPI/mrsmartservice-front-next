@@ -52,7 +52,7 @@ async function doLogin(email, password) {
         }
 
         const role = String(me.role || '').toUpperCase();
-        if (role === 'ADMIN' || role === 'DEV_ADMIN') goAdmin = true;
+        if (['ADMIN', 'DEV_ADMIN', 'CONTADOR'].includes(role)) goAdmin = true;
       } else {
         // Si /me responde 403 ó 401, lo tratamos como usuario normal
         console.warn('GET /me no OK después de login:', meRes.status);

@@ -812,6 +812,38 @@
           </div>
 
           <div class="mini-bars" id="barsVentas"></div>
+
+          <section class="panel" style="margin-top:1.5rem;">
+            <h3>Exportar reporte contable</h3>
+            <p class="text-muted">Ingresos del período, 20% y cantidad de ventas. Para Power BI: descarga Excel/CSV e impórtalo.</p>
+            <div class="filters" style="flex-wrap:wrap; gap:0.75rem;">
+              <div class="field">
+                <label for="exportRange">Rango</label>
+                <select id="exportRange" name="exportRange">
+                  <option value="month">Por mes</option>
+                  <option value="year">Por año</option>
+                </select>
+              </div>
+              <div class="field" id="exportMonthWrap">
+                <label for="exportMonth">Mes</label>
+                <select id="exportMonth" name="exportMonth"></select>
+              </div>
+              <div class="field" id="exportYearWrap" style="display:none;">
+                <label for="exportYear">Año</label>
+                <select id="exportYear" name="exportYear"></select>
+              </div>
+              <div class="field">
+                <label for="exportFormat">Formato</label>
+                <select id="exportFormat" name="exportFormat">
+                  <option value="xlsx">Excel (.xlsx)</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </div>
+              <div class="field" style="align-self:flex-end;">
+                <button type="button" class="btn btn-primary" id="btnExportReport">Descargar</button>
+              </div>
+            </div>
+          </section>
         </section>
       </div>
 
@@ -859,8 +891,31 @@
             </div>
           </form>
         </section>
-
-        <section id="usersAdmin" class="admin-card admin-users-card"></section>
+        <section id="contadorAdminCard" class="admin-card" style="display:none;">
+          <h2>Cuenta del Contador</h2>
+          <p class="text-muted" style="margin-top:-8px;">Visible solo para Administrador y Developer. Aquí puedes actualizar el correo o la contraseña del usuario <strong>CONTADOR</strong>.</p>
+          <form id="formContadorAccount" class="form-grid" autocomplete="off">
+            <div class="profile-row">
+              <div class="form-field">
+                <label for="contadorEmail">Correo del contador</label>
+                <input type="email" id="contadorEmail" placeholder="contador@tienda.com" />
+              </div>
+            </div>
+            <div class="profile-row">
+              <div class="form-field">
+                <label for="contadorPassword">Nueva contraseña (opcional)</label>
+                <input type="password" id="contadorPassword" placeholder="Mínimo 8 caracteres" />
+              </div>
+            </div>
+            <small style="color:#475569;">Sugerencia: usa <strong>aaronmotta5@gmail.com</strong> o <strong>yesfri@hotmail.es</strong> para habilitar el recordatorio por correo.</small>
+            <div class="profile-actions" style="margin-top:16px;">
+              <button type="submit" class="btn-primary">
+                Guardar cambios del contador
+              </button>
+              <p id="contadorMsg"></p>
+            </div>
+          </form>
+        </section>
 </div>
 
       <!-- ============================
@@ -1129,9 +1184,20 @@
           badge.textContent = "Developer";
         } else if (role === "ADMIN") {
           badge.textContent = "Administrador";
+        } else if (role === "CONTADOR") {
+          badge.textContent = "Contador";
         } else {
-          // USER u otro rol
           badge.textContent = "Usuario";
+        }
+        window.adminCurrentUser = me;
+        if (role === "CONTADOR") {
+          document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
+            const tab = btn.dataset.tab;
+            const show = ['tab-ventas', 'tab-estadisticas', 'tab-perfil'].includes(tab);
+            btn.style.display = show ? '' : 'none';
+          });
+          const firstVisible = document.querySelector('.tab-btn[data-tab="tab-ventas"]');
+          if (firstVisible) firstVisible.click();
         }
       } catch (err) {
         console.error("Error comprobando rol en admin.html:", err);

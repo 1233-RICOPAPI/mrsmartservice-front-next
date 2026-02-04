@@ -143,12 +143,15 @@ function toYouTubeEmbed(url) {
   }
 }
 
-// Helper 2: Resolver URL de imagen (si no la tienes ya)
+// Helper 2: Resolver URL de imagen (evita URLs malformadas como "300x200?text=Producto:1")
 function resolveImg(url) {
-  if (!url) return 'images/placeholder.jpg'; // o banner1.jpg, la que quieras usar siempre
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads')) return API_ORIGIN + url;
-  return url;
+  if (!url || typeof url !== 'string') return 'images/placeholder.jpg';
+  const u = String(url).trim();
+  if (!u || u === 'null' || u === 'undefined') return 'images/placeholder.jpg';
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  if (u.startsWith('/uploads') && typeof API_ORIGIN !== 'undefined') return API_ORIGIN + u;
+  if (u.startsWith('/') || u.startsWith('./')) return u;
+  return 'images/placeholder.jpg';
 }
 
 
