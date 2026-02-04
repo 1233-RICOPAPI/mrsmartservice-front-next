@@ -215,7 +215,7 @@ function adminBuildMediaList({ urlLines, files }) {
 function adminPickThumbUrl(mediaItems) {
   const items = Array.isArray(mediaItems) ? mediaItems : [];
   const img = items.find(m => m && m.type === 'image' && m.url);
-  return img ? img.url : 'images/placeholder.jpg';
+  return img ? img.url : 'assets/img/default-product.svg';
 }
 /********************
  * ADMIN STATS / VENTAS

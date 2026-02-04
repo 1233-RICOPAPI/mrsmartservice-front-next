@@ -145,13 +145,13 @@ function toYouTubeEmbed(url) {
 
 // Helper 2: Resolver URL de imagen (evita URLs malformadas como "300x200?text=Producto:1")
 function resolveImg(url) {
-  if (!url || typeof url !== 'string') return 'images/placeholder.jpg';
+  if (!url || typeof url !== 'string') return 'assets/img/default-product.svg';
   const u = String(url).trim();
-  if (!u || u === 'null' || u === 'undefined') return 'images/placeholder.jpg';
+  if (!u || u === 'null' || u === 'undefined') return 'assets/img/default-product.svg';
   if (u.startsWith('http://') || u.startsWith('https://')) return u;
   if (u.startsWith('/uploads') && typeof API_ORIGIN !== 'undefined') return API_ORIGIN + u;
   if (u.startsWith('/') || u.startsWith('./')) return u;
-  return 'images/placeholder.jpg';
+  return 'assets/img/default-product.svg';
 }
 
 
